@@ -19,6 +19,7 @@ model Device {
   number      String?
   sessionId   String   @unique
   status      String   @default("offline") // online | offline | connecting
+  currentQR   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   messages    MessageLog[]
@@ -49,8 +50,8 @@ model MessageLog {
   status           String    // sent | failed | pending
   failReason       String?
   sentAt           DateTime  @default(now())
-  campaign         Campaign? @relation(fields: [campaignId], references: [id])
-  device           Device?   @relation(fields: [simId], references: [sessionId])
+  campaign         Campaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  device           Device?   @relation(fields: [simId], references: [sessionId], onDelete: Cascade)
 }
 
 model Message {
@@ -64,5 +65,5 @@ model Message {
   status           String    @default("delivered") // pending | sent | delivered | read | failed
   timestamp        DateTime  @default(now())
   
-  device           Device    @relation(fields: [sessionId], references: [sessionId])
+  device           Device    @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
 }

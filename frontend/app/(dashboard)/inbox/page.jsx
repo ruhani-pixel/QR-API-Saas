@@ -6,7 +6,7 @@ import {
   MoreVertical, Phone, Video,
   Check, CheckCheck, User,
   MessageSquare, Loader2, Bot,
-  ShieldCheck, Smartphone, Zap
+  ShieldCheck, Smartphone, Zap, Plus
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 import { cn } from '@/lib/utils';
@@ -68,13 +68,11 @@ export default function InboxPage() {
   };
 
   const fetchChats = async () => {
-    // In a real app, this would be a GROUP BY remoteJid query
-    // For now, we fetch all messages and group them in memory or show recent ones
+    if (!activeDevice) return;
     try {
-      const res = await fetch(`${API_URL}/api/messages`);
+      const res = await fetch(`${API_URL}/api/messages?sessionId=${activeDevice.sessionId}`);
       const data = await res.json();
       
-      // Basic grouping for demo
       const grouped = {};
       data.forEach(m => {
         if (!grouped[m.remoteJid]) {
@@ -109,20 +107,62 @@ export default function InboxPage() {
   const handleSendMessage = async () => {
     if (!inputText.trim() || !selectedChat || !activeDevice) return;
     
-    // In a real app, you'd call a POST /api/send-message endpoint
-    // Since we don't have it yet, I'll mock the UI update and the backend will eventually catch it
-    const newMsg = {
+    const textToSend = inputText.trim();
+    setInputText('');
+    
+    const tempMsg = {
       id: Date.now().toString(),
-      content: inputText,
+      content: textToSend,
       direction: 'outbound',
       timestamp: new Date(),
       status: 'pending'
     };
+    setMessages(prev => [...prev, tempMsg]);
 
-    setMessages(prev => [...prev, newMsg]);
-    setInputText('');
+    try {
+      const res = await fetch(`${API_URL}/api/message/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: activeDevice.sessionId,
+          to: selectedChat.remoteJid,
+          text: textToSend
+        })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      
+      // Update the temp message to sent status
+      setMessages(prev => prev.map(m => m.id === tempMsg.id ? { ...m, status: 'sent' } : m));
+      // Refresh chats to show the new message as last message
+      fetchChats();
+    } catch (e) {
+      toast.error('Failed to send: ' + e.message);
+      // Mark as failed
+      setMessages(prev => prev.map(m => m.id === tempMsg.id ? { ...m, status: 'failed' } : m));
+    }
+  };
+
+  const startNewChat = () => {
+    const number = prompt("Enter phone number with country code (e.g. 918302806913):");
+    if (!number) return;
     
-    toast.success('Message queued for transmission');
+    // Clean up the number to only digits
+    const cleanNumber = number.replace(/\D/g, '');
+    if (cleanNumber.length < 10) return toast.error("Invalid phone number");
+
+    const remoteJid = `${cleanNumber}@s.whatsapp.net`;
+    const newChat = {
+      id: remoteJid,
+      remoteJid: remoteJid,
+      pushName: `+${cleanNumber}`,
+      lastMessage: 'Start of conversation',
+      timestamp: new Date(),
+      unread: 0
+    };
+    
+    setChats(prev => [newChat, ...prev.filter(c => c.remoteJid !== remoteJid)]);
+    loadChatHistory(newChat);
   };
 
   return (
@@ -161,16 +201,25 @@ export default function InboxPage() {
                ))}
             </div>
 
-            {/* Search */}
-            <div className="relative group">
-              <div className="absolute inset-y-0 left-5 flex items-center text-slate-300 group-focus-within:text-brand-gold transition-colors">
-                <Search size={18} />
+            {/* Search and New Chat */}
+            <div className="flex gap-2 items-center">
+              <div className="relative group flex-1">
+                <div className="absolute inset-y-0 left-5 flex items-center text-slate-300 group-focus-within:text-brand-gold transition-colors">
+                  <Search size={18} />
+                </div>
+                <input 
+                  type="text" 
+                  placeholder="Search conversations..." 
+                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-14 pr-6 text-sm font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-brand-gold/30 focus:bg-white transition-all shadow-sm"
+                />
               </div>
-              <input 
-                type="text" 
-                placeholder="Search conversations..." 
-                className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-14 pr-6 text-sm font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-brand-gold/30 focus:bg-white transition-all shadow-sm"
-              />
+              <button 
+                onClick={startNewChat}
+                className="bg-slate-900 hover:bg-slate-800 text-brand-gold p-4 rounded-2xl transition-all shadow-xl shadow-slate-900/10 active:scale-95 group"
+                title="New Chat"
+              >
+                <Plus size={20} className="group-hover:rotate-90 transition-transform" />
+              </button>
             </div>
           </div>
 

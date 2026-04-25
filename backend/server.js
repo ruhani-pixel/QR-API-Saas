@@ -17,9 +17,11 @@ app.get('/', (req, res) => res.send('🚀 Solid Models API is running!'));
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.NEXT_URL || "http://localhost:3000",
+    origin: "*",
     methods: ["GET", "POST"]
-  }
+  },
+  allowEIO3: true,
+  transports: ['polling', 'websocket']
 });
 
 const prisma = new PrismaClient();
@@ -30,25 +32,60 @@ const whatsapp = new Whatsapp({
     databasePath: './sessions.db'
   }),
   debugLevel: 'silent',
-  autoLoad: true,
-  onQRUpdated: (sessionId, qr) => {
-    console.log(`[Session:${sessionId}] QR Updated`);
-    io.emit(`qr:${sessionId}`, { qr });
+  autoLoad: false,
+  onQRUpdated: async (...args) => {
+    // Debug all arguments to find where the data is hiding
+    console.log('[DEBUG] onQRUpdated arguments:', JSON.stringify(args, null, 2));
+    
+    let sid = '';
+    let qr = '';
+
+    // Strategy 1: (sessionId, qr)
+    if (typeof args[0] === 'string' && typeof args[1] === 'string') {
+      sid = args[0];
+      qr = args[1];
+    } 
+    // Strategy 2: ({ sessionId, qr })
+    else if (args[0] && typeof args[0] === 'object') {
+      sid = args[0].sessionId || args[0].id || '';
+      qr = args[0].qr || args[0].data || '';
+    }
+
+    if (!sid || !qr) {
+      console.error('[CRITICAL] Failed to extract SID or QR from args!');
+      return;
+    }
+
+    console.log(`[Session:${sid}] QR Captured Successfully! Length: ${qr.length}`);
+    
+    try {
+      await prisma.device.update({
+        where: { sessionId: sid },
+        data: { currentQR: qr, status: 'connecting' }
+      });
+    } catch (e) {
+      console.error('Failed to save QR to DB:', e);
+    }
+
+    io.emit('qr', { sessionId: sid, qr });
   },
   onConnected: (sessionId) => {
-    console.log(`[Session:${sessionId}] Connected ✅`);
-    io.emit('device:status', { sessionId, status: 'online' });
-    updateDeviceStatus(sessionId, 'online');
+    const sid = typeof sessionId === 'string' ? sessionId : sessionId.sessionId || String(sessionId);
+    console.log(`[Session:${sid}] Connected ✅`);
+    io.emit('device:status', { sessionId: sid, status: 'online' });
+    updateDeviceStatus(sid, 'online', true); // true to clear QR
   },
   onDisconnected: (sessionId) => {
-    console.log(`[Session:${sessionId}] Disconnected ❌`);
-    io.emit('device:status', { sessionId, status: 'offline' });
-    updateDeviceStatus(sessionId, 'offline');
+    const sid = typeof sessionId === 'string' ? sessionId : sessionId.sessionId || String(sessionId);
+    console.log(`[Session:${sid}] Disconnected ❌`);
+    io.emit('device:status', { sessionId: sid, status: 'offline' });
+    updateDeviceStatus(sid, 'offline');
   },
   onConnecting: (sessionId) => {
-    console.log(`[Session:${sessionId}] Connecting...`);
-    io.emit('device:status', { sessionId, status: 'connecting' });
-    updateDeviceStatus(sessionId, 'connecting');
+    const sid = typeof sessionId === 'string' ? sessionId : sessionId.sessionId || String(sessionId);
+    console.log(`[Session:${sid}] Connecting...`);
+    io.emit('device:status', { sessionId: sid, status: 'connecting' });
+    updateDeviceStatus(sid, 'connecting');
   },
   onMessageReceived: async (msg) => {
     console.log(`[Session:${msg.sessionId}] New Message from ${msg.key.remoteJid}`);
@@ -78,11 +115,16 @@ const whatsapp = new Whatsapp({
   }
 });
 
-async function updateDeviceStatus(sessionId, status) {
+console.log('✅ Whatsapp Engine Initialized');
+
+async function updateDeviceStatus(sessionId, status, clearQR = false) {
   try {
+    const data = { status };
+    if (clearQR) data.currentQR = null;
+    
     await prisma.device.update({
       where: { sessionId },
-      data: { status }
+      data
     });
   } catch (e) {
     console.error('Failed to update status:', e);
@@ -92,21 +134,40 @@ async function updateDeviceStatus(sessionId, status) {
 // Initialize CronEngine
 const cronEngine = new CronEngine(whatsapp, io);
 
+// Load all saved sessions from DB
+whatsapp.load().then(() => {
+  console.log('✅ Loaded existing WhatsApp sessions');
+}).catch(err => {
+  console.error('Failed to load WhatsApp sessions:', err);
+});
+
 // ─── SESSION ROUTES ───
 
 app.post('/api/session/start', async (req, res) => {
   const { sessionId, name } = req.body;
+  const sid = String(sessionId);
+  console.log(`[API] Starting session: ${sid} for ${name}`);
   try {
+    // Force cleanup if session exists in memory
+    try {
+      await whatsapp.deleteSession(sid);
+    } catch (e) {
+      // Ignore if doesn't exist
+    }
+
     // Save or Update device in DB
     await prisma.device.upsert({
-      where: { sessionId },
-      update: { name },
-      create: { sessionId, name, status: 'connecting' }
+      where: { sessionId: sid },
+      update: { name, currentQR: null, status: 'connecting' },
+      create: { sessionId: sid, name, status: 'connecting' }
     });
 
-    await whatsapp.startSession(sessionId);
+    console.log(`[API] Triggering Whatsapp.startSession for ${sid}`);
+    await whatsapp.startSession(sid);
+    console.log(`[API] Whatsapp.startSession initiated for ${sid}`);
     res.json({ success: true, message: 'Session starting...' });
   } catch (error) {
+    console.error(`[API] Error starting session ${sid}:`, error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -114,15 +175,40 @@ app.post('/api/session/start', async (req, res) => {
 app.post('/api/session/delete', async (req, res) => {
   const { sessionId } = req.body;
   try {
-    await whatsapp.deleteSession(sessionId);
-    await prisma.device.update({
-      where: { sessionId },
-      data: { status: 'offline' }
+    try {
+      await whatsapp.deleteSession(sessionId);
+    } catch(e) {}
+    await prisma.device.delete({
+      where: { sessionId }
     });
     res.json({ success: true, message: 'Session deleted' });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
+});
+
+app.post('/api/session/bulk-delete', async (req, res) => {
+  const { sessionIds } = req.body;
+  if (!Array.isArray(sessionIds)) {
+    return res.status(400).json({ success: false, error: 'Invalid input' });
+  }
+  
+  let deletedCount = 0;
+  for (const sessionId of sessionIds) {
+    try {
+      try {
+        await whatsapp.deleteSession(sessionId);
+      } catch(e) {}
+      await prisma.device.delete({
+        where: { sessionId }
+      });
+      deletedCount++;
+    } catch (e) {
+      console.error(`Failed to delete session ${sessionId}:`, e);
+    }
+  }
+  
+  res.json({ success: true, message: `Successfully deleted ${deletedCount} sessions.` });
 });
 
 app.get('/api/sessions', async (req, res) => {
@@ -149,6 +235,42 @@ app.get('/api/messages', async (req, res) => {
     res.json(messages);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── MESSAGE ROUTES ───
+
+app.post('/api/message/send', async (req, res) => {
+  const { sessionId, to, text } = req.body;
+  if (!sessionId || !to || !text) {
+    return res.status(400).json({ success: false, error: 'Missing required fields' });
+  }
+
+  try {
+    // Send via WhatsApp
+    const response = await whatsapp.sendText({
+      sessionId,
+      to,
+      text
+    });
+
+    // Save outbound message to DB
+    await prisma.message.create({
+      data: {
+        sessionId,
+        remoteJid: to.includes('@s.whatsapp.net') ? to : `${to}@s.whatsapp.net`,
+        pushName: 'Me',
+        content: text,
+        direction: 'outbound',
+        status: 'sent',
+        timestamp: new Date()
+      }
+    });
+
+    res.json({ success: true, message: 'Message sent successfully', data: response });
+  } catch (error) {
+    console.error('Failed to send message:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to send message' });
   }
 });
 
