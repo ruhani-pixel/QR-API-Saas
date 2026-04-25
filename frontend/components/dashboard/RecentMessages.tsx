@@ -26,7 +26,7 @@ export function RecentMessages({ ownerId }: { ownerId: string | undefined }) {
            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Your recent message history will appear here.</p>
         </div>
         <p className="text-[11px] text-slate-500 font-medium max-w-xs mx-auto leading-relaxed italic">
-          Jab aapka pehla customer Website Widget ya WhatsApp par message bhejega, uski details yahan real-time mein dikhne lagengi.
+          Jab aapka pehla customer WhatsApp par message bhejega, uski details yahan real-time mein dikhne lagengi.
         </p>
       </div>
     );

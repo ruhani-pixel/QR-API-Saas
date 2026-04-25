@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -9,22 +8,18 @@ import {
 import { useDashboardStats } from '@/hooks/useDashboardStats';
 import { useDailyTrend } from '@/hooks/useDailyTrend';
 import { useAuth } from '@/hooks/useAuth';
-import { cn } from '@/lib/utils';
 import { ExportButton } from '@/components/ui/ExportButton';
 
 export default function AnalyticsPage() {
   const { user } = useAuth();
-  const [channel, setChannel] = useState<'all' | 'whatsapp' | 'website'>('all');
   const { totalStats } = useDashboardStats(user?.uid);
   const { data: trendData, loading: trendLoading } = useDailyTrend(user?.uid, 7);
 
-  const getFilteredStats = () => {
-    if (channel === 'whatsapp') return { in: totalStats.whatsappInbound || 0, out: totalStats.whatsappOutbound || 0, fail: totalStats.failedMessages || 0 };
-    if (channel === 'website') return { in: totalStats.widgetInbound || 0, out: totalStats.widgetOutbound || 0, fail: 0 };
-    return { in: totalStats.totalInbound || 0, out: totalStats.totalOutbound || 0, fail: totalStats.failedMessages || 0 };
+  const currentStats = { 
+    in: totalStats.totalInbound || 0, 
+    out: totalStats.totalOutbound || 0, 
+    fail: totalStats.failedMessages || 0 
   };
-
-  const currentStats = getFilteredStats();
 
   const distributionData = [
     { name: 'Delivered', value: (currentStats.in + currentStats.out) - (currentStats.fail || 0) },
@@ -44,23 +39,7 @@ export default function AnalyticsPage() {
         <div>
            <h1 className="text-4xl font-black tracking-tighter text-slate-900 uppercase">Analytics</h1>
            <div className="flex items-center gap-3 mt-1">
-             <p className="text-slate-500 font-medium text-xs uppercase tracking-widest opacity-70">Infrastructure Performance Monitoring</p>
-             <div className="h-4 w-[1.5px] bg-slate-200" />
-             {/* Channel Switcher */}
-             <div className="flex bg-white border border-slate-200 p-1 rounded-xl shadow-sm gap-1">
-                {(['all', 'whatsapp', 'website'] as const).map(c => (
-                  <button
-                    key={c}
-                    onClick={() => setChannel(c)}
-                    className={cn(
-                      "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all",
-                      channel === c ? "bg-slate-900 text-white shadow-sm" : "text-slate-400 hover:text-slate-600"
-                    )}
-                  >
-                    {c}
-                  </button>
-                ))}
-             </div>
+             <p className="text-slate-500 font-medium text-xs uppercase tracking-widest opacity-70">WhatsApp Infrastructure Performance</p>
            </div>
         </div>
         <div className="flex items-center gap-4">
@@ -82,7 +61,7 @@ export default function AnalyticsPage() {
           <Card key={i} className="bg-white border-slate-200 shadow-xl py-6 relative overflow-hidden group hover:scale-[1.02] transition-all">
             <div className="absolute top-0 left-0 w-2 h-full bg-slate-50 group-hover:bg-brand-gold transition-colors duration-500" />
              <CardContent className="flex flex-col items-center justify-center space-y-2">
-                <span className={cn("text-5xl font-black tracking-tighter", stat.color)}>{stat.value}</span>
+                <span className={`text-5xl font-black tracking-tighter ${stat.color}`}>{stat.value}</span>
                 <div className="flex flex-col items-center">
                    <span className="text-xs font-black text-slate-900 uppercase tracking-widest">{stat.label}</span>
                    <span className="text-[10px] text-slate-400 font-bold italic">{stat.sub}</span>
@@ -97,9 +76,9 @@ export default function AnalyticsPage() {
         <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-6">
            <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-sm font-black text-slate-900 uppercase tracking-widest">Daily Message Volume</CardTitle>
+                <CardTitle className="text-sm font-black text-slate-900 uppercase tracking-widest">Daily WhatsApp Volume</CardTitle>
                 <p className="text-[10px] text-slate-400 font-bold mt-1">
-                  Last 7 days {channel === 'all' ? 'consolidated' : channel} inbound vs outbound traffic
+                  Last 7 days inbound vs outbound traffic
                 </p>
               </div>
               <div className="flex items-center gap-4">
@@ -122,11 +101,11 @@ export default function AnalyticsPage() {
                   contentStyle={{ backgroundColor: 'rgba(255,255,255,0.95)', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', backdropFilter: 'blur(4px)' }}
                 />
                 <Bar 
-                  dataKey={channel === 'whatsapp' ? 'waIn' : channel === 'website' ? 'wbIn' : 'inbound'} 
+                  dataKey="inbound" 
                   fill="#10b981" radius={[4, 4, 0, 0]} barSize={24} 
                 />
                 <Bar 
-                  dataKey={channel === 'whatsapp' ? 'waOut' : channel === 'website' ? 'wbOut' : 'outbound'} 
+                  dataKey="outbound" 
                   fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={24} 
                 />
               </BarChart>
@@ -139,7 +118,7 @@ export default function AnalyticsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
          <Card className="bg-white border-slate-200 shadow-xl overflow-hidden">
             <CardHeader className="py-6 border-b border-slate-50">
-               <CardTitle className="text-sm font-black text-slate-900 uppercase tracking-widest">Message Success Rate</CardTitle>
+               <CardTitle className="text-sm font-black text-slate-900 uppercase tracking-widest">Success Rate</CardTitle>
             </CardHeader>
             <CardContent className="h-[350px] flex items-center justify-center relative">
                <ResponsiveContainer width="100%" height="100%">

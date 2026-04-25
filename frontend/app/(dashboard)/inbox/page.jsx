@@ -6,7 +6,7 @@ import {
   Image as ImageIcon, Video, FileText, 
   MapPin, Mic, Send, MoreVertical, 
   CheckCheck, ChevronLeft, Building2,
-  Circle
+  Circle, Inbox
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 

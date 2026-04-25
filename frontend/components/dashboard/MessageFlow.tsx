@@ -16,8 +16,7 @@ export function MessageFlow({ ownerId }: { ownerId: string | undefined }) {
         <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto border border-slate-100/50">
            <MessageSquare className="w-5 h-5 text-slate-200" />
         </div>
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">No activity detected yet.</p>
-        <p className="text-[9px] text-slate-300 font-medium px-4 leading-relaxed">System is ready. Use the Website Widget or WhatsApp to trigger a live sync.</p>
+        <p className="text-[9px] text-slate-300 font-medium px-4 leading-relaxed">System is ready. Use your connected WhatsApp devices to trigger a live sync.</p>
       </div>
     );
   }

@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { ActivityChart } from '@/components/dashboard/ActivityChart';
 import { RecentMessages } from '@/components/dashboard/RecentMessages';
@@ -9,37 +8,16 @@ import { useDashboardStats } from '@/hooks/useDashboardStats';
 import { useAuth } from '@/hooks/useAuth';
 import { MessageSquare, Send, AlertTriangle, Users } from 'lucide-react';
 import { ExportButton } from '@/components/ui/ExportButton';
-import { cn } from '@/lib/utils';
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [sourceFilter, setSourceFilter] = useState<'all' | 'whatsapp' | 'website'>('all');
   const { dailyStats, totalStats } = useDashboardStats(user?.uid);
 
-  const getFilteredStats = (stats: any) => {
-    if (sourceFilter === 'whatsapp') {
-      return {
-        inbound: stats.whatsappInbound || 0,
-        outbound: stats.whatsappOutbound || 0,
-        failed: stats.failedMessages || 0
-      };
-    }
-    if (sourceFilter === 'website') {
-      return {
-        inbound: stats.widgetInbound || 0,
-        outbound: stats.widgetOutbound || 0,
-        failed: 0 // Failures primarily tracked via WhatsApp API
-      };
-    }
-    return {
-      inbound: stats.totalInbound || 0,
-      outbound: stats.totalOutbound || 0,
-      failed: stats.failedMessages || 0
-    };
+  const d = {
+    inbound: dailyStats.totalInbound || 0,
+    outbound: dailyStats.totalOutbound || 0,
+    failed: dailyStats.failedMessages || 0
   };
-
-  const d = getFilteredStats(dailyStats);
-  const t = getFilteredStats(totalStats);
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -47,23 +25,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-3xl font-black tracking-tight text-slate-900 mb-1 uppercase">Control Center</h1>
           <div className="flex items-center gap-3">
-             <p className="text-slate-500 font-medium text-[10px] uppercase tracking-widest opacity-70">Unified Infrastructure Hub</p>
-             <div className="h-4 w-[1.5px] bg-slate-200" />
-             {/* Source Switcher */}
-             <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
-                {(['all', 'whatsapp', 'website'] as const).map(s => (
-                  <button
-                    key={s}
-                    onClick={() => setSourceFilter(s)}
-                    className={cn(
-                      "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all",
-                      sourceFilter === s ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600"
-                    )}
-                  >
-                    {s}
-                  </button>
-                ))}
-             </div>
+             <p className="text-slate-500 font-medium text-[10px] uppercase tracking-widest opacity-70">WhatsApp Management Hub</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -76,7 +38,7 @@ export default function DashboardPage() {
           title="Total Messages Today" 
           value={d.inbound + d.outbound} 
           icon={MessageSquare}
-          description={sourceFilter === 'all' ? "Combined inbound & outbound" : `${sourceFilter} total traffic`}
+          description="Combined traffic"
         />
         <StatCard 
           title="Total Inbound Today" 
@@ -94,7 +56,7 @@ export default function DashboardPage() {
           title="Failed Messages Today" 
           value={d.failed} 
           icon={AlertTriangle}
-          description="Infrastructure errors"
+          description="System error logs"
         />
       </div>
 
