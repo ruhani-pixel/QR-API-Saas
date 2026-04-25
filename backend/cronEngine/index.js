@@ -10,6 +10,35 @@ class CronEngine {
     this.io = io;
     this.activeWorkers = new Map(); // campaignId -> [SIMWorker]
     this.logger = new CronLogger('MAIN');
+    
+    // Recover crashed campaigns on startup
+    this.recoverCrashedCampaigns();
+  }
+
+  /**
+   * Recover campaigns that were active when the server crashed
+   */
+  async recoverCrashedCampaigns() {
+    try {
+      const activeCampaigns = await prisma.campaign.findMany({
+        where: { status: 'active' },
+        include: { logs: { where: { status: 'pending' } } }
+      });
+
+      if (activeCampaigns.length > 0) {
+        this.logger.warn(`Recovering ${activeCampaigns.length} crashed campaigns`);
+        for (const campaign of activeCampaigns) {
+          this.logger.info(`Resuming campaign: ${campaign.name}`);
+          // Treat remaining numbers as a new start for the campaign
+          await this.startCampaign({
+            ...campaign,
+            numbers: campaign.logs.map(log => ({ phone: log.recipientNumber, name: log.recipientName }))
+          });
+        }
+      }
+    } catch (err) {
+      this.logger.error(`Recovery failed: ${err.message}`);
+    }
   }
 
   async startCampaign(campaignData) {

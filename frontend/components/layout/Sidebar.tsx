@@ -33,6 +33,7 @@ export function Sidebar() {
   const handleSignOut = async () => {
     setSigningOut(true);
     document.cookie = 'firebase-token=; path=/; max-age=0';
+    localStorage.removeItem('token');
     router.push('/login');
   };
 
