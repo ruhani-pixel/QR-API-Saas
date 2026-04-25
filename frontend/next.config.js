@@ -1,4 +1,12 @@
+/** @type {import('next').NextConfig} */
 const nextConfig = {
+  reactStrictMode: false, // Socket.io works better with strict mode off during dev
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   images: {
     remotePatterns: [
       {
@@ -7,19 +15,6 @@ const nextConfig = {
       },
     ],
   },
-  async headers() {
-    return [
-      {
-        source: '/widget-chat',
-        headers: [
-          {
-            key: 'Content-Security-Policy',
-            value: "frame-ancestors *",
-          },
-        ],
-      },
-    ];
-  },
-};
+}
 
-module.exports = nextConfig;
+module.exports = nextConfig

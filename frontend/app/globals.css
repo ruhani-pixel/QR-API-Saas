@@ -3,77 +3,56 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 15, 23, 42;
-  --background-start-rgb: 248, 250, 252;
-  --background-end-rgb: 255, 255, 255;
+  --background: #020617;
+  --foreground: #f8fafc;
+  --brand-gold: #fbbf24;
+  --card-bg: rgba(15, 23, 42, 0.7);
+  --border-color: rgba(51, 65, 85, 0.5);
 }
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900;
+    @apply bg-slate-950 text-slate-50 selection:bg-amber-500/30 selection:text-amber-200;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
 
 @layer components {
-  .glass {
-    @apply bg-white/70 backdrop-blur-xl border-white/40 shadow-sm transition-all duration-300;
+  .glass-card {
+    @apply bg-slate-900/50 backdrop-blur-xl border border-slate-800/50 rounded-3xl shadow-2xl;
+  }
+  
+  .glass-button {
+    @apply relative overflow-hidden transition-all duration-300 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .premium-gradient {
+    @apply bg-gradient-to-br from-amber-300 via-amber-500 to-amber-700;
+  }
+
+  .text-premium-gold {
+    @apply bg-gradient-to-r from-amber-200 via-amber-400 to-amber-200 bg-clip-text text-transparent font-black;
+  }
+
+  .nav-link-active {
+    @apply bg-slate-900 text-amber-400 shadow-lg shadow-amber-500/10 border border-slate-800;
   }
 }
 
-.brand-gold {
-  color: #C5A059;
-}
-
-.bg-brand-gold {
-  background-color: #C5A059;
-}
-
-@layer base {
-  :root {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-  }
-}
-
-/* Custom Glassmorphism */
-.glass {
-  background: rgba(15, 23, 42, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-
-
-/* Scrollbar styling */
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
-  height: 6px;
 }
+
 ::-webkit-scrollbar-track {
-  background: transparent;
+  @apply bg-slate-950;
 }
+
 ::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 10px;
+  @apply bg-slate-800 rounded-full hover:bg-slate-700 transition-colors;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: #475569;
-}
+
+/* Status Colors */
+.status-online { @apply text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]; }
+.status-offline { @apply text-rose-400 drop-shadow-[0_0_8px_rgba(251,113,133,0.5)]; }
+.status-connecting { @apply text-amber-400 animate-pulse; }

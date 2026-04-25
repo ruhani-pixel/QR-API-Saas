@@ -3,8 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
 import { PLANS } from '@/lib/plans';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
@@ -17,7 +15,6 @@ const INDUSTRIES = [
   'Real Estate', 'E-Commerce', 'Education', 
   'Healthcare', 'Retail', 'Other'
 ];
-
 export default function OnboardingPage() {
   const router = useRouter();
   const { user, loading, onboardingComplete, role } = useAuth();
@@ -42,26 +39,8 @@ export default function OnboardingPage() {
     if (!user) return;
     setSaving(true);
     try {
-      const plan = selectedPlan === 'pro_monthly' ? PLANS.PRO_MONTHLY 
-                 : selectedPlan === 'enterprise_monthly' ? PLANS.ENTERPRISE_MONTHLY 
-                 : PLANS.FREE_TRIAL;
-
-      const trialEnd = new Date();
-      trialEnd.setDate(trialEnd.getDate() + 15);
-
-      await updateDoc(doc(db, 'users', user.uid), {
-        companyName: companyName || 'My Workspace',
-        industry: industry || 'Other',
-        planId: selectedPlan,
-        planStatus: 'active',
-        messageLimit: plan.messageLimit,
-        messageCount: 0,
-        accountType: 'platform',
-        onboardingComplete: true,
-        trialExpiresAt: selectedPlan === 'free_trial' ? trialEnd : null,
-        updatedAt: serverTimestamp(),
-      });
-
+      // Mock Finish
+      console.log('Onboarding complete (Mock)');
       router.push('/dashboard');
     } catch (err) {
       console.error('Onboarding error:', err);
@@ -69,6 +48,7 @@ export default function OnboardingPage() {
       setSaving(false);
     }
   };
+
 
   if (loading) {
     return (

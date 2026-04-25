@@ -1,0 +1,53 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+
+
+
+model Device {
+  id          String   @id @default(cuid())
+  name        String
+  number      String?
+  sessionId   String   @unique
+  status      String   @default("offline") // online | offline | connecting
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  messages    MessageLog[]
+}
+
+model Campaign {
+  id          String        @id @default(cuid())
+  name        String
+  message     String
+  mediaPath   String?
+  status      String        @default("pending") // pending | active | paused | completed | stopped
+  totalSent   Int           @default(0)
+  totalFailed Int           @default(0)
+  totalNumbers Int          @default(0)
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime      @default(now())
+  logs        MessageLog[]
+}
+
+model MessageLog {
+  id               String    @id @default(cuid())
+  simId            String
+  campaignId       String?
+  recipientNumber  String
+  recipientName    String    @default("")
+  status           String    // sent | failed | pending
+  failReason       String?
+  sentAt           DateTime  @default(now())
+  campaign         Campaign? @relation(fields: [campaignId], references: [id])
+  device           Device?   @relation(fields: [simId], references: [sessionId])
+}

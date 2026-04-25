@@ -1,9 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { auth, db } from '@/lib/firebase/config';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Download, Sparkles, Smartphone, Laptop, MoveRight } from 'lucide-react';
@@ -39,52 +36,18 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
     try {
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      const userRef = doc(db, 'users', user.uid);
-      const userSnap = await getDoc(userRef);
-
-      if (!userSnap.exists()) {
-        await setDoc(userRef, {
-          uid: user.uid,
-          email: user.email,
-          name: user.displayName,
-          photoURL: user.photoURL,
-          role: 'user',
-          isApproved: true,
-          onboardingComplete: false,
-          tenantId: user.uid,
-          planId: 'free_trial',
-          planStatus: 'active',
-          messageCount: 0,
-          messageLimit: 100,
-          createdAt: serverTimestamp(),
-          lastLoginAt: serverTimestamp(),
-        });
-      } else {
-        await setDoc(userRef, { lastLoginAt: serverTimestamp() }, { merge: true });
-      }
-
-      const idToken = await user.getIdToken();
-      document.cookie = `firebase-token=${idToken}; path=/; max-age=3600; SameSite=Strict`;
-      localStorage.setItem('token', idToken);
-
-      const updatedSnap = await getDoc(userRef);
-      const data = updatedSnap.data();
+      // Mock Login
+      document.cookie = `firebase-token=MOCK_TOKEN; path=/; max-age=3600; SameSite=Strict`;
+      localStorage.setItem('token', 'MOCK_TOKEN');
       
-      if (data?.role === 'agent' || data?.onboardingComplete) {
-        router.push('/dashboard');
-      } else {
-        router.push('/onboarding');
-      }
+      router.push('/dashboard');
     } catch (err: any) {
       setError(err.message || 'Failed to sign in');
     } finally {
       setLoading(false);
     }
   };
+
 
   return (
     <div className="min-h-screen flex bg-white text-slate-900 selection:bg-indigo-100">

@@ -16,10 +16,7 @@ import {
   Zap
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { db } from '@/lib/firebase/config';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@/hooks/useAuth';
-
 export default function OnboardingSetupPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -62,21 +59,8 @@ export default function OnboardingSetupPage() {
     if (!user) return;
     setLoading(true);
     try {
-      const userRef = doc(db, 'users', user.uid);
-      
-      const trialExpiry = new Date();
-      trialExpiry.setDate(trialExpiry.getDate() + 15);
-
-      await updateDoc(userRef, {
-        ...formData,
-        planId: planId,
-        planStatus: 'active',
-        trialExpiresAt: trialExpiry,
-        messageCount: 0,
-        messageLimit: planId === 'enterprise_monthly' ? 999999 : planId === 'pro_monthly' ? 1000 : 100,
-        onboardingComplete: true,
-        updatedAt: serverTimestamp()
-      });
+      // Mock Submit
+      console.log('Setup complete (Mock)');
       router.push('/dashboard');
     } catch (error) {
       console.error('Failed to save onboarding data:', error);
@@ -84,6 +68,7 @@ export default function OnboardingSetupPage() {
       setLoading(false);
     }
   };
+
 
   return (
     <div className="max-w-2xl mx-auto py-10 px-4">

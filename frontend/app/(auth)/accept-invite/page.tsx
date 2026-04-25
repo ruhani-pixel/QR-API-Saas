@@ -2,8 +2,6 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase/config';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { Button } from '@/components/ui/Button';
 import { ShieldCheck, UserPlus, ArrowRight, Bot, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
@@ -19,22 +17,10 @@ function AcceptInviteContent() {
     
     setLoading(true);
     try {
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const token = await result.user.getIdToken();
+      // Mock Join
+      document.cookie = `firebase-token=MOCK_TOKEN; path=/; max-age=3600; SameSite=Strict`;
+      localStorage.setItem('token', 'MOCK_TOKEN');
       
-      const res = await fetch('/api/user/accept-invite', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ inviteId })
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to join team');
-
       toast.success('Successfully joined the team! Redirecting...');
       router.push('/dashboard');
     } catch (err: any) {
@@ -43,6 +29,7 @@ function AcceptInviteContent() {
       setLoading(false);
     }
   };
+
 
   if (!inviteId) {
     return (

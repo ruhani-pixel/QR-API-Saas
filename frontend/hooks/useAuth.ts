@@ -1,48 +1,37 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { auth, db } from '../lib/firebase/config';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, onSnapshot } from 'firebase/firestore';
 import { AdminUser, UserRole } from '../types/user';
 
 export function useAuth() {
-  const [user, setUser] = useState<FirebaseUser | null>(null);
-  const [adminData, setAdminData] = useState<AdminUser | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (authUser) => {
-      setUser(authUser);
-      if (!authUser) {
-        setAdminData(null);
-        setLoading(false);
-        return;
-      }
-
-      // Listen to Firestore doc for this user
-      const docRef = doc(db, 'users', authUser.uid);
-      const unsubscribeDoc = onSnapshot(docRef, (docSnap) => {
-        if (docSnap.exists()) {
-          setAdminData(docSnap.data() as AdminUser);
-        } else {
-          setAdminData(null);
-        }
-        setLoading(false);
-      });
-
-      return () => unsubscribeDoc();
-    });
-
-    return () => unsubscribeAuth();
-  }, []);
+  const [loading, setLoading] = useState(false);
+  
+  // Dummy Admin User for UI/UX demonstration
+  const [adminData] = useState<AdminUser>({
+    uid: 'dummy-uid-123',
+    email: 'admin@example.com',
+    role: 'admin' as UserRole,
+    isApproved: true,
+    accountType: 'platform' as any,
+    onboardingComplete: true,
+    name: 'RD Models Admin',
+    photoURL: 'https://api.dicebear.com/7.x/avataaars/svg?seed=admin',
+    lastLoginAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+  } as any);
 
   return { 
-    user, 
-    role: adminData?.role || 'user' as UserRole, 
-    isApproved: adminData?.isApproved || false, 
-    accountType: adminData?.accountType || null,
-    onboardingComplete: adminData?.onboardingComplete || false,
+    user: { 
+      uid: 'dummy-uid-123', 
+      email: 'admin@example.com',
+      displayName: 'RD Models Admin',
+      photoURL: 'https://api.dicebear.com/7.x/avataaars/svg?seed=admin'
+    }, 
+    role: 'admin' as UserRole, 
+    isApproved: true, 
+    accountType: 'platform',
+    onboardingComplete: true,
     adminData,
     loading 
   };
 }
+

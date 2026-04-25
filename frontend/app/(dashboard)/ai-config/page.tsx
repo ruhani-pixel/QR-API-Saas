@@ -8,8 +8,6 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Bot, Key, Cpu, Zap, Settings2, Sliders, Sparkles, Loader2, Save, MessageSquare, Send, BarChart3, PieChart, History, TrendingUp, RefreshCcw, Wallet, Phone, MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { db } from '@/lib/firebase/config';
-import { doc, getDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
 
 export default function AIConfigPage() {

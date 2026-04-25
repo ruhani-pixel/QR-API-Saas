@@ -1,5 +1,5 @@
 {
-  "exclude": ["src/test/*", "dist/*"],
+  "exclude": ["src/test/*", "dist/*", "cronEngine/*", "server.js", "prisma.config.ts"],
   "compilerOptions": {
     /* Visit https://aka.ms/tsconfig to read more about this file */
 

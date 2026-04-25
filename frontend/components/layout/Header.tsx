@@ -1,24 +1,22 @@
 'use client';
 
 import { useAuth } from '@/hooks/useAuth';
-import { auth } from '@/lib/firebase/config';
-import { signOut } from 'firebase/auth';
 import { LogOut, Mail, MessageSquare } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { cn } from '@/lib/utils';
 import { useRouter, usePathname } from 'next/navigation';
 
 export function Header() {
-  const { user, role } = useAuth();
+  const { user, role } = useAuth() as any;
   const router = useRouter();
   const pathname = usePathname();
 
   const handleLogout = async () => {
     document.cookie = 'firebase-token=; path=/; max-age=0';
     localStorage.removeItem('token');
-    await signOut(auth);
     router.push('/login');
   };
+
 
   const isGmail = pathname?.startsWith('/gmail');
 

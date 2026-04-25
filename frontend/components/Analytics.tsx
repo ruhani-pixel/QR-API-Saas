@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
-import { initAnalytics } from "@/lib/firebase/config";
 
 export function Analytics() {
   useEffect(() => {
-    initAnalytics();
+    // Analytics disabled or moved to local tracking
+    console.log("Analytics initialized (Local Stub)");
   }, []);
 
   return null;
