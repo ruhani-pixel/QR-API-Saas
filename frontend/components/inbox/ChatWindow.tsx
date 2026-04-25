@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import { Contact } from '@/types/contact';
 import { useMessages } from '@/hooks/useMessages';
 import { useAuth } from '@/hooks/useAuth';
-import { Bot, Send, Paperclip, MoreVertical, ShieldCheck, CheckCheck } from 'lucide-react';
+import { Bot, MoreVertical, ShieldCheck, CheckCheck } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { cn, formatPhone } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
@@ -33,17 +33,6 @@ export function ChatWindow({ contact }: ChatWindowProps) {
     }
   }, [chatMessages, contact.isTyping]);
 
-  const exportChat = () => {
-    const data = JSON.stringify(chatMessages, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `chat_${contact.phoneNumber}_${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    toast.success('Chat export complete!');
-  };
-
   return (
     <div className="h-full flex flex-col bg-white border border-slate-200/60 rounded-[2rem] shadow-sm overflow-hidden border-brand-gold/20">
       
@@ -57,36 +46,6 @@ export function ChatWindow({ contact }: ChatWindowProps) {
             </h3>
             <div className="flex items-center gap-2">
                {(() => {
-                 const isWidget = contact.source === 'widget';
-                 const [timeLeft, setTimeLeft] = useState<string>('');
-                 
-                 useEffect(() => {
-                   if (isWidget) return;
-                   const calculate = () => {
-                     const lastInbound = contact.lastInboundAt?.seconds 
-                       ? new Date(contact.lastInboundAt.seconds * 1000) 
-                       : null;
-                     if (!lastInbound) return;
-                     
-                     const expiry = lastInbound.getTime() + 24 * 60 * 60 * 1000;
-                     const diff = expiry - Date.now();
-                     
-                     if (diff <= 0) {
-                       setTimeLeft('EXPIRED');
-                     } else {
-                       const hours = Math.floor(diff / (1000 * 60 * 60));
-                       const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-                       setTimeLeft(`${hours}h ${mins}m left`);
-                     }
-                   };
-                   
-                   calculate();
-                   const timer = setInterval(calculate, 60000); // Update every minute
-                   return () => clearInterval(timer);
-                 }, [contact.lastInboundAt]);
-
-                 const isSessionActive = isWidget || isTestNumber || (timeLeft !== 'EXPIRED' && timeLeft !== '');
-
                  if (isTestNumber) {
                    return (
                      <>
@@ -100,15 +59,9 @@ export function ChatWindow({ contact }: ChatWindowProps) {
 
                  return (
                    <>
-                     <div className={cn(
-                       "w-1.5 h-1.5 rounded-full", 
-                       isSessionActive ? "bg-emerald-500 animate-[pulse_2s_infinite]" : "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]"
-                     )} />
-                     <span className={cn(
-                       "text-[9px] font-black uppercase tracking-[0.15em] leading-none",
-                       isSessionActive ? "text-emerald-600" : "text-rose-600"
-                     )}>
-                       {isWidget ? 'WEBSITE SESSION ● FREE' : (isSessionActive ? `WHATSAPP SESSION ● FREE (${timeLeft})` : 'SESSION EXPIRED ● TEMPLATE REQUIRED')}
+                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-[pulse_2s_infinite]" />
+                     <span className="text-[9px] font-black uppercase tracking-[0.15em] leading-none text-emerald-600">
+                       WHATSAPP SESSION ● ACTIVE
                      </span>
                    </>
                  );
@@ -197,7 +150,7 @@ export function ChatWindow({ contact }: ChatWindowProps) {
       >
         {chatMessages.length === 0 && !loading && (
           <div className="h-full flex flex-col items-center justify-center opacity-30 text-center">
-             <MessageSquare className="w-12 h-12 text-slate-300 mb-4" />
+             <div className="text-3xl mb-4">💬</div>
              <p className="text-xs font-black uppercase tracking-widest text-slate-400">Security Encrypted Feed</p>
           </div>
         )}
@@ -308,8 +261,4 @@ export function ChatWindow({ contact }: ChatWindowProps) {
 
     </div>
   );
-}
-
-function MessageSquare({ className }: any) {
-  return <div className={className}>💬</div>;
 }

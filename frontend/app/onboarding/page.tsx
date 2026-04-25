@@ -208,10 +208,6 @@ export default function OnboardingPage() {
                     <span className="text-[10px] font-semibold uppercase tracking-wider">Inbox</span>
                   </div>
                   <div className="flex flex-col items-center gap-2 text-slate-600">
-                    <Globe className="w-5 h-5" />
-                    <span className="text-[10px] font-semibold uppercase tracking-wider">Widget</span>
-                  </div>
-                  <div className="flex flex-col items-center gap-2 text-slate-600">
                     <Users className="w-5 h-5" />
                     <span className="text-[10px] font-semibold uppercase tracking-wider">Team</span>
                   </div>

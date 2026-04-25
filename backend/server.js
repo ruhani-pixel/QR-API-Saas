@@ -50,9 +50,31 @@ const whatsapp = new Whatsapp({
     io.emit('device:status', { sessionId, status: 'connecting' });
     updateDeviceStatus(sessionId, 'connecting');
   },
-  onMessageReceived: (msg) => {
+  onMessageReceived: async (msg) => {
     console.log(`[Session:${msg.sessionId}] New Message from ${msg.key.remoteJid}`);
-    io.emit('message:incoming', msg);
+    
+    // Save to DB
+    try {
+      const content = msg.message?.conversation || 
+                      msg.message?.extendedTextMessage?.text || 
+                      (msg.message?.imageMessage ? '[Image]' : '[Media]');
+      
+      await prisma.message.create({
+        data: {
+          sessionId: msg.sessionId,
+          remoteJid: msg.key.remoteJid,
+          pushName: msg.pushName || 'WhatsApp User',
+          content: content,
+          direction: msg.key.fromMe ? 'outbound' : 'inbound',
+          status: 'delivered',
+          timestamp: new Date()
+        }
+      });
+      
+      io.emit('message:incoming', msg);
+    } catch (e) {
+      console.error('Failed to save message:', e);
+    }
   }
 });
 
@@ -63,7 +85,7 @@ async function updateDeviceStatus(sessionId, status) {
       data: { status }
     });
   } catch (e) {
-    // Device might not be in DB yet
+    console.error('Failed to update status:', e);
   }
 }
 

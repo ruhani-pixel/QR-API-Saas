@@ -1,231 +1,284 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useRef } from 'react';
 import { 
-  Search, Filter, Paperclip, 
-  Image as ImageIcon, Video, FileText, 
-  MapPin, Mic, Send, MoreVertical, 
+  Search, Paperclip, 
+  Mic, Send, MoreVertical, 
   CheckCheck, ChevronLeft, Building2,
-  Circle, Inbox
+  Circle, Inbox, User, Bot,
+  Phone, Video, ShieldCheck,
+  Filter, Plus, Smile,
+  Image as ImageIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Avatar } from '@/components/ui/Avatar';
 
 export default function InboxPage() {
   const [selectedDevice, setSelectedDevice] = useState('all');
   const [selectedChat, setSelectedChat] = useState(null);
-  const [isMobileListOpen, setIsMobileListOpen] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const messagesEndRef = useRef(null);
 
   const devices = [
-    { id: 'all', name: 'All Devices', count: 47 },
+    { id: 'all', name: 'All Clusters', count: 47 },
     { id: 'm01-s1', name: 'M-01 SIM1', count: 12 },
     { id: 'm01-s2', name: 'M-01 SIM2', count: 5 },
     { id: 'm02-s1', name: 'M-02 SIM1', count: 30 },
   ];
 
   const chats = [
-    { id: '1', name: 'Rahul Kumar', lastMsg: 'Bhai order kab aayega?', time: '2m', unread: true, device: 'M-01 SIM1', avatar: 'RK' },
-    { id: '2', name: 'Priya Sharma', lastMsg: 'Photo bhejo please', time: '5m', unread: false, device: 'M-01 SIM2', avatar: 'PS' },
-    { id: '3', name: 'Amit Verma', lastMsg: 'Haan confirm hai, kal milte hain', time: '12m', unread: false, device: 'M-02 SIM1', avatar: 'AV' },
-    { id: '4', name: 'Vikas Tech', lastMsg: 'Payment received! ✅', time: '1h', unread: false, device: 'M-01 SIM1', avatar: 'VT' },
+    { id: '1', name: 'Rahul Kumar', lastMsg: 'Bhai order kab aayega?', time: '2m', unread: true, device: 'M-01 SIM1', avatar: 'RK', status: 'online' },
+    { id: '2', name: 'Priya Sharma', lastMsg: 'Photo bhejo please', time: '5m', unread: false, device: 'M-01 SIM2', avatar: 'PS', status: 'offline' },
+    { id: '3', name: 'Amit Verma', lastMsg: 'Haan confirm hai, kal milte hain', time: '12m', unread: false, device: 'M-02 SIM1', avatar: 'AV', status: 'online' },
+    { id: '4', name: 'Vikas Tech', lastMsg: 'Payment received! ✅', time: '1h', unread: false, device: 'M-01 SIM1', avatar: 'VT', status: 'offline' },
+    { id: '5', name: 'Suresh Raina', lastMsg: 'Bhai check karo update.', time: '2h', unread: true, device: 'M-02 SIM1', avatar: 'SR', status: 'online' },
   ];
 
   const messages = [
     { id: '1', text: 'Bhai order kab aayega?', time: '10:23 AM', sender: 'them' },
-    { id: '2', text: 'Kal tak ho jaega, tension mat lo.', time: '10:25 AM', sender: 'me', status: 'read' },
-    { id: '3', text: 'Okay thanks 🙏', time: '10:26 AM', sender: 'them' },
+    { id: '2', text: 'Kal tak ho jaega, tension mat lo. Hamari team kaam kar rahi hai.', time: '10:25 AM', sender: 'me', status: 'read' },
+    { id: '3', text: 'Okay thanks 🙏. Best service.', time: '10:26 AM', sender: 'them' },
+    { id: '4', text: 'Aur haan, discount code bhi apply kar dena next time.', time: '10:27 AM', sender: 'them' },
+    { id: '5', text: 'Sure, hum check karte hain.', time: '10:30 AM', sender: 'me', status: 'delivered' },
   ];
 
-  return (
-    <div className="h-[calc(100vh-2rem)] m-4 glass-card overflow-hidden flex flex-col">
-      <div className="flex-1 flex overflow-hidden">
-        
-        {/* PANEL 1: DEVICES (FILTER) */}
-        <div className="w-20 lg:w-64 border-r border-slate-800/50 flex flex-col bg-slate-950/20">
-          <div className="p-6 border-b border-slate-800/50">
-            <h2 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] hidden lg:block">Channels</h2>
-            <Building2 className="lg:hidden text-slate-500" size={20} />
-          </div>
-          <div className="flex-1 overflow-y-auto p-2 lg:p-4 space-y-1 custom-scrollbar">
-            {devices.map((device) => (
-              <button
-                key={device.id}
-                onClick={() => setSelectedDevice(device.id)}
-                className={cn(
-                  "w-full flex items-center gap-3 p-3 rounded-2xl transition-all duration-300 group",
-                  selectedDevice === device.id ? "bg-amber-500/10 text-amber-500" : "text-slate-500 hover:bg-slate-900"
-                )}
-              >
-                <div className={cn(
-                  "w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all",
-                  selectedDevice === device.id ? "bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20" : "bg-slate-900 border border-slate-800"
-                )}>
-                  <span className="text-[10px] font-black">{device.id === 'all' ? '∞' : device.id.split('-')[1].toUpperCase()}</span>
-                </div>
-                <div className="hidden lg:flex flex-col items-start overflow-hidden">
-                  <span className="text-xs font-bold truncate w-full">{device.name}</span>
-                  <span className="text-[10px] font-medium text-slate-600">{device.count} chats</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [selectedChat]);
 
-        {/* PANEL 2: CONVERSATIONS (CHAT LIST) */}
-        <div className={cn(
-          "w-full md:w-80 lg:w-96 border-r border-slate-800/50 flex flex-col bg-slate-950/10",
-          !isMobileListOpen && "hidden md:flex"
-        )}>
-          <div className="p-6 space-y-4 border-b border-slate-800/50">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-black text-white uppercase tracking-tighter">Inbox</h2>
-              <div className="bg-amber-500/10 text-amber-500 text-[10px] font-black px-2 py-1 rounded-lg animate-pulse">47 NEW</div>
-            </div>
-            <div className="relative group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-amber-500 transition-colors" size={16} />
+  return (
+    <div className="h-screen w-full flex animate-in fade-in zoom-in duration-700 p-2 lg:p-4">
+      <div className="flex-1 bg-white border border-slate-100 rounded-[3rem] shadow-2xl shadow-slate-200/50 overflow-hidden flex selection:bg-brand-gold/20">
+      
+      {/* Left Panel: Chat List */}
+      <div className={cn(
+        "w-full md:w-[380px] lg:w-[420px] flex flex-col border-r border-slate-50 transition-all duration-500",
+        selectedChat && "hidden md:flex"
+      )}>
+        {/* Chat List Header */}
+        <div className="p-8 pb-4 space-y-6">
+           <div className="flex items-center justify-between">
+              <h1 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Messages</h1>
+              <button className="w-10 h-10 rounded-xl bg-slate-900 text-brand-gold flex items-center justify-center shadow-lg shadow-slate-900/10 active:scale-95 transition-all">
+                <Plus size={20} />
+              </button>
+           </div>
+
+           {/* Device Filter Strip */}
+           <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+              {devices.map(d => (
+                <button
+                  key={d.id}
+                  onClick={() => setSelectedDevice(d.id)}
+                  className={cn(
+                    "px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest whitespace-nowrap transition-all border",
+                    selectedDevice === d.id 
+                      ? "bg-slate-900 text-brand-gold border-slate-900 shadow-lg shadow-slate-900/10" 
+                      : "bg-slate-50 text-slate-400 border-transparent hover:border-slate-200"
+                  )}
+                >
+                  {d.name} <span className="opacity-40 ml-1">{d.count}</span>
+                </button>
+              ))}
+           </div>
+
+           {/* Search Bar */}
+           <div className="relative group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-brand-gold transition-colors" size={18} />
               <input 
                 type="text" 
                 placeholder="Search conversations..." 
-                className="w-full bg-slate-950/50 border border-slate-800/50 rounded-2xl py-3 pl-12 pr-4 text-xs text-white focus:outline-none focus:border-amber-500/30 transition-all"
+                className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-xs font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:bg-white focus:border-brand-gold/30 transition-all shadow-sm"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
               />
-            </div>
-          </div>
-          
-          <div className="flex-1 overflow-y-auto custom-scrollbar">
-            {chats.map((chat) => (
-              <button
-                key={chat.id}
-                onClick={() => { setSelectedChat(chat); setIsMobileListOpen(false); }}
-                className={cn(
-                  "w-full p-5 flex gap-4 transition-all hover:bg-slate-900/50 border-b border-slate-900/50 group relative",
-                  selectedChat?.id === chat.id && "bg-slate-900/80"
-                )}
-              >
-                {selectedChat?.id === chat.id && (
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500" />
-                )}
-                <div className="relative">
-                   <div className="w-12 h-12 rounded-2xl bg-slate-800 flex items-center justify-center text-sm font-black text-white group-hover:bg-slate-700 transition-colors">
-                    {chat.avatar}
-                  </div>
-                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-slate-950 rounded-full flex items-center justify-center">
-                    <div className="w-2 h-2 bg-emerald-500 rounded-full" />
-                  </div>
-                </div>
-                <div className="flex-1 text-left space-y-1">
-                  <div className="flex justify-between items-start">
-                    <span className="text-sm font-bold text-white">{chat.name}</span>
-                    <span className="text-[10px] font-bold text-slate-600">{chat.time}</span>
-                  </div>
-                  <p className="text-xs text-slate-500 truncate w-48 leading-relaxed">{chat.lastMsg}</p>
-                  <div className="flex justify-between items-center mt-2">
-                    <span className="text-[9px] font-black text-amber-500/60 uppercase tracking-widest">{chat.device}</span>
-                    {chat.unread && <div className="w-2 h-2 bg-amber-500 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.5)]" />}
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
+           </div>
         </div>
 
-        {/* PANEL 3: CHAT WINDOW */}
-        <div className={cn(
-          "flex-1 flex flex-col bg-slate-950/5",
-          isMobileListOpen && "hidden md:flex"
-        )}>
-          {selectedChat ? (
-            <>
-              {/* Chat Header */}
-              <div className="p-6 border-b border-slate-800/50 flex items-center justify-between bg-slate-900/20">
-                <div className="flex items-center gap-4">
-                  <button onClick={() => setIsMobileListOpen(true)} className="md:hidden p-2 text-slate-500">
-                    <ChevronLeft size={20} />
+        {/* Chat List Scrollable Area */}
+        <div className="flex-1 overflow-y-auto px-4 pb-8 space-y-1 custom-scrollbar">
+           {chats.map(chat => (
+             <button
+               key={chat.id}
+               onClick={() => setSelectedChat(chat)}
+               className={cn(
+                 "w-full flex items-center gap-4 p-4 rounded-[2rem] transition-all duration-300 group relative",
+                 selectedChat?.id === chat.id 
+                   ? "bg-slate-50 shadow-sm" 
+                   : "hover:bg-slate-50/50"
+               )}
+             >
+                {selectedChat?.id === chat.id && (
+                  <motion.div layoutId="active-chat" className="absolute left-0 w-1.5 h-10 bg-brand-gold rounded-full" />
+                )}
+                
+                <div className="relative shrink-0">
+                   <Avatar name={chat.avatar} size="md" className="shadow-md" />
+                   <div className={cn(
+                     "absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white",
+                     chat.status === 'online' ? "bg-emerald-500" : "bg-slate-300"
+                   )} />
+                </div>
+
+                <div className="flex-1 text-left min-w-0">
+                   <div className="flex justify-between items-end mb-1">
+                      <span className="text-[13px] font-black text-slate-900 truncate tracking-tight">{chat.name}</span>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase">{chat.time}</span>
+                   </div>
+                   <div className="flex justify-between items-center">
+                      <p className={cn(
+                        "text-[11px] truncate leading-tight",
+                        chat.unread ? "font-black text-slate-900" : "font-medium text-slate-400"
+                      )}>{chat.lastMsg}</p>
+                      {chat.unread && (
+                        <div className="w-2 h-2 rounded-full bg-brand-gold shadow-lg shadow-brand-gold/40" />
+                      )}
+                   </div>
+                   <div className="flex items-center gap-1.5 mt-1.5">
+                      <Building2 size={10} className="text-slate-300" />
+                      <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest">{chat.device}</span>
+                   </div>
+                </div>
+             </button>
+           ))}
+        </div>
+      </div>
+
+      {/* Right Panel: Chat Window */}
+      <div className={cn(
+        "flex-1 flex flex-col bg-slate-50/20 relative",
+        !selectedChat && "hidden md:flex items-center justify-center"
+      )}>
+        {selectedChat ? (
+          <>
+            {/* Chat Header */}
+            <div className="p-6 md:p-8 bg-white border-b border-slate-50 flex items-center justify-between z-10">
+               <div className="flex items-center gap-4">
+                  <button 
+                    onClick={() => setSelectedChat(null)}
+                    className="md:hidden p-2 text-slate-400 hover:text-slate-900"
+                  >
+                    <ChevronLeft size={24} />
                   </button>
-                  <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center font-bold text-white text-xs">
-                    {selectedChat.avatar}
+                  <div className="relative">
+                    <Avatar name={selectedChat.avatar} size="md" />
+                    <div className={cn(
+                      "absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white",
+                      selectedChat.status === 'online' ? "bg-emerald-500" : "bg-slate-300"
+                    )} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-black text-white">{selectedChat.name}</h3>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest flex items-center gap-1">
-                        <Circle size={6} fill="currentColor" /> Online
-                      </span>
-                      <span className="text-slate-700">•</span>
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">via {selectedChat.device}</span>
+                    <h2 className="text-lg font-black text-slate-900 tracking-tight leading-none mb-1.5">{selectedChat.name}</h2>
+                    <div className="flex items-center gap-3">
+                       <div className="flex items-center gap-1.5">
+                          <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", selectedChat.status === 'online' ? "bg-emerald-500" : "bg-slate-400")} />
+                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{selectedChat.status === 'online' ? 'Active Sync' : 'Last Seen: 2h ago'}</span>
+                       </div>
+                       <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Via {selectedChat.device}</span>
                     </div>
                   </div>
-                </div>
-                <div className="flex gap-2">
-                   <button className="p-3 text-slate-500 hover:text-white hover:bg-slate-800 rounded-xl transition-all">
-                    <Search size={18} />
-                   </button>
-                   <button className="p-3 text-slate-500 hover:text-white hover:bg-slate-800 rounded-xl transition-all">
-                    <MoreVertical size={18} />
-                   </button>
-                </div>
-              </div>
+               </div>
 
-              {/* Messages Area */}
-              <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
-                {messages.map((msg) => (
-                  <div key={msg.id} className={cn(
-                    "flex flex-col max-w-[80%]",
-                    msg.sender === 'me' ? "ml-auto items-end" : "items-start"
-                  )}>
+               <div className="flex items-center gap-2">
+                  {[Phone, Video, Search, MoreVertical].map((Icon, i) => (
+                    <button key={i} className="p-3 text-slate-300 hover:text-slate-900 hover:bg-slate-50 rounded-2xl transition-all active:scale-90">
+                      <Icon size={20} />
+                    </button>
+                  ))}
+               </div>
+            </div>
+
+            {/* Messages Area */}
+            <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
+               {/* Date Separator */}
+               <div className="flex items-center justify-center">
+                  <span className="px-4 py-1.5 bg-white border border-slate-100 rounded-full text-[9px] font-black text-slate-400 uppercase tracking-widest shadow-sm">Today, April 25</span>
+               </div>
+
+               {messages.map((msg, i) => (
+                 <div key={i} className={cn(
+                   "flex flex-col max-w-[80%] md:max-w-[70%] lg:max-w-[60%]",
+                   msg.sender === 'me' ? "ml-auto items-end" : "mr-auto items-start"
+                 )}>
                     <div className={cn(
-                      "p-4 rounded-3xl text-sm leading-relaxed shadow-xl",
+                      "px-6 py-4 text-[13px] font-medium leading-relaxed shadow-sm transition-all duration-300 hover:shadow-md",
                       msg.sender === 'me' 
-                        ? "bg-amber-500 text-slate-950 rounded-tr-none font-medium" 
-                        : "bg-slate-900 border border-slate-800 text-white rounded-tl-none"
+                        ? "bg-slate-900 text-white rounded-[1.8rem] rounded-tr-none" 
+                        : "bg-white border border-slate-100 text-slate-700 rounded-[1.8rem] rounded-tl-none"
                     )}>
                       {msg.text}
                     </div>
-                    <div className="flex items-center gap-2 mt-2 px-2">
-                      <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">{msg.time}</span>
-                      {msg.sender === 'me' && <CheckCheck size={12} className="text-amber-600" />}
+                    <div className="flex items-center gap-2 mt-2 px-1">
+                       <span className="text-[9px] font-bold text-slate-300 uppercase tracking-tighter">{msg.time}</span>
+                       {msg.sender === 'me' && (
+                         <CheckCheck size={12} className={cn(msg.status === 'read' ? "text-brand-gold" : "text-slate-300")} />
+                       )}
                     </div>
-                  </div>
-                ))}
-              </div>
+                 </div>
+               ))}
+               <div ref={messagesEndRef} />
+            </div>
 
-              {/* Input Area */}
-              <div className="p-6 bg-slate-900/40 border-t border-slate-800/50">
-                <div className="flex items-end gap-4 max-w-5xl mx-auto">
-                  <div className="flex items-center gap-1 mb-2">
-                    <button className="p-2 text-slate-500 hover:text-amber-500 hover:bg-amber-500/10 rounded-lg transition-all">
-                      <Paperclip size={20} />
-                    </button>
-                    <button className="p-2 text-slate-500 hover:text-amber-500 hover:bg-amber-500/10 rounded-lg transition-all">
-                      <Mic size={20} />
-                    </button>
+            {/* Chat Input Area */}
+            <div className="p-8 bg-white border-t border-slate-50">
+               <div className="bg-slate-50 border border-slate-100 rounded-[2rem] p-2 flex items-center gap-2 group focus-within:border-brand-gold/30 focus-within:bg-white transition-all shadow-sm">
+                  <div className="flex items-center">
+                     <button className="p-3 text-slate-400 hover:text-brand-gold transition-colors">
+                        <Paperclip size={20} />
+                     </button>
+                     <button className="p-3 text-slate-400 hover:text-brand-gold transition-colors">
+                        <Smile size={20} />
+                     </button>
                   </div>
                   
-                  <div className="flex-1 relative">
-                    <textarea 
-                      placeholder="Type your message..."
-                      rows={1}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-3xl py-4 px-6 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-all resize-none overflow-hidden"
-                      style={{ minHeight: '52px' }}
-                    />
-                  </div>
+                  <input 
+                    type="text" 
+                    placeholder="Write a secure message..." 
+                    className="flex-1 bg-transparent border-none text-sm font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none py-2 px-2"
+                  />
 
-                  <button className="h-[52px] w-[52px] flex-shrink-0 premium-gradient rounded-full flex items-center justify-center text-slate-950 shadow-lg shadow-amber-500/20 active:scale-90 transition-all">
-                    <Send size={20} fill="currentColor" />
-                  </button>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center p-20 text-center space-y-6 opacity-20">
-               <div className="w-32 h-32 rounded-full border-2 border-dashed border-slate-700 flex items-center justify-center">
-                 <Inbox size={48} className="text-slate-500" />
+                  <div className="flex items-center gap-2 pr-1">
+                     <button className="p-3 text-slate-400 hover:text-slate-900 transition-colors">
+                        <Mic size={20} />
+                     </button>
+                     <button className="w-12 h-12 bg-slate-900 text-brand-gold rounded-2xl flex items-center justify-center shadow-xl shadow-slate-900/20 active:scale-90 transition-all">
+                        <Send size={20} />
+                     </button>
+                  </div>
                </div>
-               <div className="space-y-2">
-                 <h3 className="text-xl font-black text-white uppercase tracking-tighter">Select a Conversation</h3>
-                 <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Pick a node or chat to start management</p>
+               <div className="flex items-center justify-center mt-4 gap-4 opacity-50">
+                  <div className="flex items-center gap-1.5">
+                    <ShieldCheck size={10} className="text-emerald-500" />
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">End-to-End Encrypted</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Bot size={10} className="text-brand-gold" />
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">AI Agent: Engaged</span>
+                  </div>
                </div>
             </div>
-          )}
-        </div>
+          </>
+        ) : (
+          <div className="text-center space-y-6 max-w-sm animate-in fade-in zoom-in duration-700">
+             <div className="relative">
+                <div className="absolute inset-0 bg-brand-gold/20 blur-3xl rounded-full" />
+                <div className="relative w-32 h-32 bg-white border border-slate-100 rounded-[3rem] flex items-center justify-center mx-auto shadow-2xl">
+                   <Inbox size={48} strokeWidth={1} className="text-slate-200" />
+                </div>
+             </div>
+             <div className="space-y-2">
+                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Cluster Hub</h3>
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] leading-relaxed">
+                   Select a conversation from your connected <span className="text-brand-gold">SIM Nodes</span> to start secure communication.
+                </p>
+             </div>
+             <div className="flex flex-wrap justify-center gap-2 pt-4">
+                {['Direct Reply', 'AI Assistant', 'Bulk Response'].map(f => (
+                  <span key={f} className="px-3 py-1 bg-slate-50 border border-slate-100 rounded-lg text-[9px] font-black text-slate-400 uppercase tracking-widest">{f}</span>
+                ))}
+             </div>
+          </div>
+        )}
+      </div>
       </div>
     </div>
   );

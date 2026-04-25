@@ -10,7 +10,6 @@ export const PLANS = {
       'AI Auto-Reply',
       '100 Messages',
       'WhatsApp Inbox',
-      'Website Widget (Watermark)',
     ],
   },
   PRO_MONTHLY: {
@@ -24,7 +23,6 @@ export const PLANS = {
       '5,000 Messages',
       'Up to 5 Team Members',
       'Custom AI Persona',
-      'Website Widget',
       'Priority Support',
     ],
     isPopular: true,

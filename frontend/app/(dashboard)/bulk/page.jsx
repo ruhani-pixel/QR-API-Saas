@@ -5,15 +5,16 @@ import {
   Zap, MessageSquare, Building2, 
   Users, ShieldCheck, ChevronRight, 
   ChevronLeft, Play, Clock, AlertTriangle,
-  Image as ImageIcon, FileText, Video
+  Image as ImageIcon, FileText, Video,
+  Rocket, Sparkles, Send
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const STEPS = [
-  { id: 1, label: 'Compose', icon: MessageSquare },
-  { id: 2, label: 'Choose SIMs', icon: Building2 },
-  { id: 3, label: 'Recipients', icon: Users },
-  { id: 4, label: 'Review', icon: ShieldCheck },
+  { id: 1, label: 'Compose', icon: MessageSquare, description: 'Write your content' },
+  { id: 2, label: 'Nodes', icon: Building2, description: 'Select your SIMs' },
+  { id: 3, label: 'Audience', icon: Users, description: 'Import recipients' },
+  { id: 4, label: 'Review', icon: ShieldCheck, description: 'Safety check' },
 ];
 
 export default function BulkPage() {
@@ -37,98 +38,128 @@ export default function BulkPage() {
   const prevStep = () => setCurrentStep(prev => Math.max(prev - 1, 1));
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-10">
+    <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-6xl mx-auto pb-24">
       {/* Header */}
-      <header className="flex flex-col items-center text-center gap-4">
-        <div className="p-4 bg-amber-500/10 text-amber-500 rounded-3xl animate-pulse">
-          <Zap size={32} />
+      <header className="flex flex-col items-center text-center space-y-4">
+        <div className="relative">
+           <div className="absolute inset-0 bg-brand-gold/20 blur-2xl rounded-full" />
+           <div className="relative w-20 h-20 bg-slate-900 rounded-[2.5rem] flex items-center justify-center text-brand-gold shadow-2xl shadow-slate-900/20">
+             <Zap size={36} fill="currentColor" />
+           </div>
         </div>
         <div className="space-y-1">
-          <h1 className="text-4xl font-black text-white tracking-tighter uppercase">
-            Campaign <span className="text-premium-gold">Wizard</span>
+          <h1 className="text-5xl font-black text-slate-900 tracking-tighter uppercase leading-none">
+            Campaign <span className="text-brand-gold">Wizard</span>
           </h1>
-          <p className="text-slate-500 font-medium">Broadcast safely with randomized timing patterns.</p>
+          <div className="flex items-center justify-center gap-3 mt-2">
+             <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 rounded-full border border-emerald-100">
+                <ShieldCheck size={12} className="text-emerald-500" />
+                <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest leading-none">Safe Broadcast Active</span>
+             </div>
+             <p className="text-slate-400 font-bold text-[10px] uppercase tracking-[0.2em] opacity-70">Solid Models Infrastructure</p>
+          </div>
         </div>
       </header>
 
       {/* Stepper */}
-      <div className="flex justify-between items-center px-10 relative">
-        <div className="absolute left-20 right-20 top-1/2 -translate-y-1/2 h-[2px] bg-slate-900" />
+      <div className="flex justify-between items-center px-16 relative py-4">
+        <div className="absolute left-24 right-24 top-1/2 -translate-y-1/2 h-0.5 bg-slate-100" />
         {STEPS.map((step) => (
-          <div key={step.id} className="relative z-10 flex flex-col items-center gap-3">
+          <div key={step.id} className="relative z-10 flex flex-col items-center gap-4 group">
             <div className={cn(
-              "w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500",
-              currentStep >= step.id ? "premium-gradient text-slate-950 shadow-lg shadow-amber-500/20" : "bg-slate-950 border border-slate-800 text-slate-600"
+              "w-16 h-16 rounded-[1.8rem] flex items-center justify-center transition-all duration-700 relative",
+              currentStep === step.id 
+                ? "bg-slate-900 text-brand-gold shadow-2xl shadow-slate-900/20 scale-110" 
+                : currentStep > step.id 
+                ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/10" 
+                : "bg-white border border-slate-100 text-slate-300 group-hover:border-brand-gold/30"
             )}>
-              <step.icon size={20} />
+              {currentStep > step.id ? <ShieldCheck size={24} /> : <step.icon size={24} />}
+              {currentStep === step.id && (
+                 <motion.div 
+                   layoutId="active-glow"
+                   className="absolute inset-0 bg-brand-gold/20 blur-xl rounded-full -z-10"
+                 />
+              )}
             </div>
-            <span className={cn(
-              "text-[10px] font-black uppercase tracking-widest transition-colors",
-              currentStep >= step.id ? "text-amber-500" : "text-slate-700"
-            )}>{step.label}</span>
+            <div className="text-center">
+              <span className={cn(
+                "text-[10px] font-black uppercase tracking-[0.2em] block mb-0.5",
+                currentStep === step.id ? "text-slate-900" : "text-slate-400"
+              )}>{step.label}</span>
+              <span className="text-[8px] font-bold text-slate-300 uppercase tracking-tighter hidden lg:block">{step.description}</span>
+            </div>
           </div>
         ))}
       </div>
 
       {/* Content Area */}
-      <div className="glass-card p-10 min-h-[450px] flex flex-col">
+      <div className="bg-white border border-slate-100 rounded-[3rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.05)] p-12 min-h-[500px] flex flex-col relative overflow-hidden selection:bg-brand-gold/20">
         <AnimatePresence mode="wait">
           {currentStep === 1 && (
             <motion.div 
               key="step1"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-8 flex-1"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-10 flex-1"
             >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Campaign Identity</label>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                <div className="space-y-8">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                       <Sparkles className="w-4 h-4 text-brand-gold" />
+                       <label className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Campaign Identity</label>
+                    </div>
                     <input 
                       type="text" 
-                      placeholder="e.g. Diwali Offer 2025"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 px-6 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-all"
+                      placeholder="e.g. Diwali Special Offer 2025"
+                      className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-5 px-6 text-sm font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:bg-white focus:border-brand-gold/30 transition-all shadow-sm"
                       value={campaign.name}
                       onChange={e => setCampaign({...campaign, name: e.target.value})}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Message Content</label>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                       <MessageSquare className="w-4 h-4 text-brand-gold" />
+                       <label className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Message Content</label>
+                    </div>
                     <textarea 
                       placeholder="Type your broadcast message here..."
-                      rows={6}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 px-6 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-all"
+                      rows={8}
+                      className="w-full bg-slate-50 border border-slate-100 rounded-3xl py-6 px-6 text-sm font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:bg-white focus:border-brand-gold/30 transition-all shadow-sm leading-relaxed"
                       value={campaign.message}
                       onChange={e => setCampaign({...campaign, message: e.target.value})}
                     />
                   </div>
                 </div>
-                <div className="space-y-6">
-                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Visual Assets (Optional)</label>
+                <div className="space-y-10">
+                   <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                       <Rocket className="w-4 h-4 text-brand-gold" />
+                       <label className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Visual Assets (Optional)</label>
+                    </div>
                     <div className="grid grid-cols-3 gap-4">
-                      <button className="flex flex-col items-center justify-center gap-2 p-6 bg-slate-950 border border-slate-800 rounded-2xl text-slate-500 hover:text-amber-500 hover:border-amber-500/50 transition-all group">
-                        <ImageIcon size={24} />
-                        <span className="text-[8px] font-bold uppercase">Image</span>
-                      </button>
-                      <button className="flex flex-col items-center justify-center gap-2 p-6 bg-slate-950 border border-slate-800 rounded-2xl text-slate-500 hover:text-amber-500 hover:border-amber-500/50 transition-all">
-                        <Video size={24} />
-                        <span className="text-[8px] font-bold uppercase">Video</span>
-                      </button>
-                      <button className="flex flex-col items-center justify-center gap-2 p-6 bg-slate-950 border border-slate-800 rounded-2xl text-slate-500 hover:text-amber-500 hover:border-amber-500/50 transition-all">
-                        <FileText size={24} />
-                        <span className="text-[8px] font-bold uppercase">Doc</span>
-                      </button>
+                      {[
+                        { icon: ImageIcon, label: 'Image' },
+                        { icon: Video, label: 'Video' },
+                        { icon: FileText, label: 'Doc' },
+                      ].map((asset, i) => (
+                        <button key={i} className="flex flex-col items-center justify-center gap-3 p-8 bg-slate-50 border border-slate-100 rounded-[2rem] text-slate-400 hover:text-brand-gold hover:bg-white hover:border-brand-gold/30 transition-all group shadow-sm">
+                          <asset.icon size={28} strokeWidth={1.5} className="group-hover:scale-110 transition-transform" />
+                          <span className="text-[9px] font-black uppercase tracking-widest">{asset.label}</span>
+                        </button>
+                      ))}
                     </div>
                   </div>
-                  <div className="p-6 bg-amber-500/5 border border-amber-500/10 rounded-2xl space-y-2">
-                    <div className="flex items-center gap-2 text-amber-500">
-                      <AlertTriangle size={14} />
-                      <span className="text-[10px] font-black uppercase tracking-widest">Optimization Tip</span>
+                  <div className="p-8 bg-brand-gold/5 border border-brand-gold/10 rounded-[2.5rem] space-y-4 relative overflow-hidden group">
+                    <div className="absolute -right-4 -top-4 w-16 h-16 bg-brand-gold/10 blur-2xl group-hover:scale-150 transition-all duration-700" />
+                    <div className="flex items-center gap-3 text-brand-gold">
+                      <AlertTriangle size={20} />
+                      <span className="text-xs font-black uppercase tracking-widest">Optimization Strategy</span>
                     </div>
-                    <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
-                      Use personalized variables like <code className="text-amber-400">{"{{name}}"}</code> to make messages more unique and reduce detection risk.
+                    <p className="text-[11px] text-slate-500 font-bold leading-relaxed uppercase tracking-tight">
+                      Use personalized variables like <code className="text-brand-gold bg-brand-gold/10 px-2 py-0.5 rounded-md">{"{{name}}"}</code> to make each message unique. This significantly reduces detection risk on WhatsApp servers.
                     </p>
                   </div>
                 </div>
@@ -139,20 +170,20 @@ export default function BulkPage() {
           {currentStep === 2 && (
             <motion.div 
               key="step2"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-8 flex-1"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-10 flex-1"
             >
-              <div className="flex justify-between items-end">
+              <div className="flex justify-between items-end pb-4 border-b border-slate-50">
                 <div>
-                  <h2 className="text-xl font-black text-white uppercase tracking-tighter">Select Outbound Nodes</h2>
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Choose which SIMs will send this campaign</p>
+                  <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Outbound Infrastructure</h2>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Select SIM nodes for campaign distribution</p>
                 </div>
-                <button className="text-[10px] font-black text-amber-500 uppercase underline underline-offset-4">Select All Online</button>
+                <button className="text-[10px] font-black text-brand-gold uppercase tracking-widest hover:underline decoration-2 underline-offset-8">Select All Active</button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {sims.map((sim) => (
                   <button
                     key={sim.id}
@@ -163,30 +194,30 @@ export default function BulkPage() {
                       else setCampaign({...campaign, selectedSIMs: [...campaign.selectedSIMs, sim.id]});
                     }}
                     className={cn(
-                      "flex items-center justify-between p-6 rounded-2xl border transition-all text-left",
+                      "flex items-center justify-between p-8 rounded-[2rem] border transition-all duration-500 text-left relative overflow-hidden group",
                       campaign.selectedSIMs.includes(sim.id) 
-                        ? "bg-amber-500/10 border-amber-500/50" 
-                        : "bg-slate-950 border-slate-900 hover:border-slate-800",
-                      sim.status === 'offline' && "opacity-40 cursor-not-allowed"
+                        ? "bg-slate-900 border-slate-800 shadow-2xl shadow-slate-900/20" 
+                        : "bg-white border-slate-100 hover:border-brand-gold/30 shadow-sm",
+                      sim.status === 'offline' && "opacity-40 cursor-not-allowed grayscale"
                     )}
                   >
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-6 relative z-10">
                       <div className={cn(
-                        "w-12 h-12 rounded-xl flex items-center justify-center",
-                        campaign.selectedSIMs.includes(sim.id) ? "bg-amber-500 text-slate-950" : "bg-slate-900 text-slate-500"
+                        "w-16 h-16 rounded-2xl flex items-center justify-center transition-all duration-500",
+                        campaign.selectedSIMs.includes(sim.id) ? "bg-brand-gold text-slate-900" : "bg-slate-50 text-slate-300 group-hover:bg-brand-gold/10 group-hover:text-brand-gold"
                       )}>
-                        <Building2 size={24} />
+                        <Building2 size={32} />
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-white">{sim.name}</h4>
-                        <p className="text-[10px] font-medium text-slate-500">{sim.number}</p>
+                        <h4 className={cn("text-base font-black tracking-tight", campaign.selectedSIMs.includes(sim.id) ? "text-white" : "text-slate-900")}>{sim.name}</h4>
+                        <p className={cn("text-[10px] font-black uppercase tracking-widest", campaign.selectedSIMs.includes(sim.id) ? "text-slate-500" : "text-slate-400")}>{sim.number}</p>
                       </div>
                     </div>
                     <div className={cn(
-                      "w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all",
-                      campaign.selectedSIMs.includes(sim.id) ? "bg-amber-500 border-amber-500 text-slate-950" : "border-slate-800"
+                      "w-8 h-8 rounded-xl border-2 flex items-center justify-center transition-all duration-500 relative z-10",
+                      campaign.selectedSIMs.includes(sim.id) ? "bg-brand-gold border-brand-gold text-slate-900" : "border-slate-100 bg-slate-50 group-hover:border-brand-gold/30"
                     )}>
-                      {campaign.selectedSIMs.includes(sim.id) && <Play size={12} fill="currentColor" />}
+                      {campaign.selectedSIMs.includes(sim.id) && <Play size={16} fill="currentColor" className="ml-0.5" />}
                     </div>
                   </button>
                 ))}
@@ -197,28 +228,56 @@ export default function BulkPage() {
           {currentStep === 3 && (
             <motion.div 
               key="step3"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-8 flex-1"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-10 flex-1"
             >
-              <div>
-                <h2 className="text-xl font-black text-white uppercase tracking-tighter">Recipients</h2>
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Total Limit: {campaign.selectedSIMs.length * 120} numbers across {campaign.selectedSIMs.length} SIMs</p>
+              <div className="flex justify-between items-end pb-4 border-b border-slate-50">
+                <div>
+                  <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Target Audience</h2>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">SIM Cluster Limit: {campaign.selectedSIMs.length * 120} Recipients</p>
+                </div>
               </div>
 
-              <div className="space-y-4">
-                <div className="flex gap-4">
-                   <button className="flex-1 p-4 bg-slate-950 border border-slate-800 rounded-2xl text-[10px] font-black text-slate-500 uppercase tracking-widest hover:border-amber-500/30 hover:text-amber-500 transition-all">Upload CSV/Excel</button>
-                   <button className="flex-1 p-4 bg-slate-950 border border-slate-800 rounded-2xl text-[10px] font-black text-slate-500 uppercase tracking-widest hover:border-amber-500/30 hover:text-amber-500 transition-all">Paste Numbers</button>
+              <div className="space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                   <button className="p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem] flex flex-col items-center gap-4 group hover:bg-white hover:border-brand-gold/30 transition-all shadow-sm">
+                      <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-slate-400 group-hover:text-brand-gold shadow-sm transition-all">
+                        <FileText size={28} />
+                      </div>
+                      <div className="text-center">
+                        <span className="text-[11px] font-black text-slate-900 uppercase tracking-widest block">Upload CSV/Excel</span>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Format: Number, Name</span>
+                      </div>
+                   </button>
+                   <button className="p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem] flex flex-col items-center gap-4 group hover:bg-white hover:border-brand-gold/30 transition-all shadow-sm">
+                      <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-slate-400 group-hover:text-brand-gold shadow-sm transition-all">
+                        <Users size={28} />
+                      </div>
+                      <div className="text-center">
+                        <span className="text-[11px] font-black text-slate-900 uppercase tracking-widest block">Select from Contacts</span>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">From your existing database</span>
+                      </div>
+                   </button>
                 </div>
-                <textarea 
-                  placeholder="Format: 919876543210, 919999999999..."
-                  rows={8}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 px-6 text-xs text-white font-mono focus:outline-none focus:border-amber-500/50 transition-all"
-                  value={campaign.recipients}
-                  onChange={e => setCampaign({...campaign, recipients: e.target.value})}
-                />
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                     <ShieldCheck className="w-4 h-4 text-brand-gold" />
+                     <label className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Manual Entry (Pasted List)</label>
+                  </div>
+                  <textarea 
+                    placeholder="919876543210, 919999999999, 910000000000..."
+                    rows={8}
+                    className="w-full bg-slate-50 border border-slate-100 rounded-[2rem] py-8 px-8 text-xs font-mono font-bold text-slate-700 placeholder:text-slate-300 focus:outline-none focus:bg-white focus:border-brand-gold/30 transition-all shadow-sm leading-loose"
+                    value={campaign.recipients}
+                    onChange={e => setCampaign({...campaign, recipients: e.target.value})}
+                  />
+                  <div className="flex justify-between items-center px-4">
+                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Format: Country Code + Number (comma separated)</span>
+                     <span className="text-[9px] font-black text-brand-gold uppercase tracking-widest">{campaign.recipients.split(',').filter(x => x.trim()).length} Detected</span>
+                  </div>
+                </div>
               </div>
             </motion.div>
           )}
@@ -226,63 +285,79 @@ export default function BulkPage() {
           {currentStep === 4 && (
             <motion.div 
               key="step4"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-8 flex-1"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-10 flex-1"
             >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                <div className="space-y-8">
-                  <div>
-                    <h2 className="text-xl font-black text-white uppercase tracking-tighter">Safety Protocol</h2>
-                    <p className="text-xs font-bold text-emerald-500 uppercase tracking-widest">Anti-Ban Protection: Engaged</p>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                <div className="space-y-10">
+                  <div className="pb-4 border-b border-slate-50">
+                    <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Safety Protocol</h2>
+                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mt-1 italic">Anti-Ban Engine Ready</p>
                   </div>
 
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-5 bg-slate-950 border border-slate-900 rounded-2xl">
-                      <div className="flex items-center gap-3">
-                        <Clock className="text-amber-500" size={18} />
-                        <span className="text-xs font-bold text-slate-300">Random Interval</span>
-                      </div>
-                      <span className="text-xs font-black text-white">20 - 35 sec</span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="p-8 bg-slate-50 border border-slate-100 rounded-[2rem] flex flex-col gap-4 group hover:bg-white transition-all shadow-sm">
+                       <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-brand-gold shadow-sm">
+                         <Clock size={24} />
+                       </div>
+                       <div className="space-y-1">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Random Interval</p>
+                          <p className="text-xl font-black text-slate-900 tracking-tight">20 - 35 Sec</p>
+                       </div>
                     </div>
-                    <div className="flex items-center justify-between p-5 bg-slate-950 border border-slate-900 rounded-2xl">
-                      <div className="flex items-center gap-3">
-                        <Zap className="text-amber-500" size={18} />
-                        <span className="text-xs font-bold text-slate-300">Burst Break</span>
-                      </div>
-                      <span className="text-xs font-black text-white">25 min / 15 msgs</span>
+                    <div className="p-8 bg-slate-50 border border-slate-100 rounded-[2rem] flex flex-col gap-4 group hover:bg-white transition-all shadow-sm">
+                       <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-brand-gold shadow-sm">
+                         <Zap size={24} />
+                       </div>
+                       <div className="space-y-1">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Burst Break</p>
+                          <p className="text-xl font-black text-slate-900 tracking-tight">25 Min / Cycle</p>
+                       </div>
                     </div>
                   </div>
                   
-                  <div className="p-6 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl">
-                     <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
-                       Your campaign will be distributed across <span className="text-white font-bold">{campaign.selectedSIMs.length} SIMs</span>. Each SIM will take approximately <span className="text-white font-bold">6-7 hours</span> to complete the broadcast to ensure safety.
+                  <div className="p-8 bg-emerald-50 border border-emerald-100 rounded-[2.5rem] relative overflow-hidden group shadow-sm">
+                     <div className="absolute -right-4 -top-4 w-16 h-16 bg-emerald-200/20 blur-2xl group-hover:scale-150 transition-all duration-700" />
+                     <div className="flex items-center gap-3 text-emerald-600 mb-3">
+                        <ShieldCheck size={20} />
+                        <span className="text-xs font-black uppercase tracking-widest">Deployment Logic</span>
+                     </div>
+                     <p className="text-[11px] text-emerald-600 font-bold leading-relaxed uppercase tracking-tight opacity-80">
+                       Distributed across <span className="text-emerald-700 font-black">{campaign.selectedSIMs.length} Nodes</span>. Target completion window: <span className="text-emerald-700 font-black">6-8 Hours</span> to ensure human-like behavior.
                      </p>
                   </div>
                 </div>
 
-                <div className="glass-card p-8 bg-slate-950 border-slate-800 shadow-inner">
-                   <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] mb-6">Execution Summary</h3>
-                   <div className="space-y-6">
-                      <div>
-                        <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Campaign</p>
-                        <p className="text-sm font-bold text-white">{campaign.name || 'Untitled Campaign'}</p>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-900 rounded-[3rem] p-10 text-white relative overflow-hidden shadow-2xl">
+                   <div className="absolute -right-10 -top-10 w-40 h-40 bg-brand-gold/10 blur-[100px]" />
+                   <div className="relative z-10 h-full flex flex-col">
+                     <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-10 border-b border-white/5 pb-4">Deployment Summary</h3>
+                     <div className="space-y-8 flex-1">
                         <div>
-                          <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Recipients</p>
-                          <p className="text-xl font-black text-white">{campaign.recipients.split(',').length}</p>
+                          <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Campaign Identity</p>
+                          <p className="text-xl font-black text-white tracking-tight">{campaign.name || 'Untitled Campaign'}</p>
                         </div>
-                        <div>
-                          <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">SIM Nodes</p>
-                          <p className="text-xl font-black text-white">{campaign.selectedSIMs.length}</p>
+                        <div className="grid grid-cols-2 gap-8">
+                          <div>
+                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Recipients</p>
+                            <p className="text-4xl font-black text-brand-gold tracking-tighter">{campaign.recipients.split(',').filter(x => x.trim()).length}</p>
+                          </div>
+                          <div>
+                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">SIM Nodes</p>
+                            <p className="text-4xl font-black text-brand-gold tracking-tighter">{campaign.selectedSIMs.length}</p>
+                          </div>
                         </div>
-                      </div>
-                      <div className="pt-6 border-t border-slate-900">
-                        <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-2">Message Preview</p>
-                        <p className="text-xs text-slate-400 italic line-clamp-3">"{campaign.message}"</p>
-                      </div>
+                        <div className="pt-8 border-t border-white/5">
+                          <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                             <MessageSquare size={12} /> Message Preview
+                          </p>
+                          <div className="bg-white/5 rounded-2xl p-6 italic text-[13px] text-slate-300 leading-relaxed border border-white/5">
+                             "{campaign.message || 'No message content provided yet...'}"
+                          </div>
+                        </div>
+                     </div>
                    </div>
                 </div>
               </div>
@@ -291,30 +366,32 @@ export default function BulkPage() {
         </AnimatePresence>
 
         {/* Footer Navigation */}
-        <div className="mt-auto pt-10 flex justify-between border-t border-slate-900/50">
+        <div className="mt-auto pt-12 flex justify-between items-center">
           <button 
             onClick={prevStep}
-            disabled={currentStep === 1}
-            className="flex items-center gap-2 px-6 py-4 rounded-2xl text-xs font-black text-slate-500 uppercase tracking-widest hover:text-white disabled:opacity-0 transition-all"
+            className={cn(
+              "flex items-center gap-3 px-8 py-4 rounded-2xl text-[11px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 hover:bg-slate-50 transition-all duration-300",
+              currentStep === 1 && "opacity-0 pointer-events-none"
+            )}
           >
-            <ChevronLeft size={18} />
-            Back
+            <ChevronLeft size={20} />
+            Prev Step
           </button>
 
           {currentStep < 4 ? (
             <button 
               onClick={nextStep}
-              className="premium-gradient px-10 py-4 rounded-2xl text-xs font-black text-slate-950 uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition-all"
+              className="bg-slate-900 hover:bg-slate-800 text-white px-12 py-5 rounded-[1.8rem] text-[11px] font-black uppercase tracking-widest flex items-center gap-3 shadow-2xl shadow-slate-900/20 active:scale-95 transition-all group"
             >
               Continue
-              <ChevronRight size={18} />
+              <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />
             </button>
           ) : (
             <button 
-              className="bg-emerald-500 px-10 py-4 rounded-2xl text-xs font-black text-slate-950 uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
+              className="bg-brand-gold hover:bg-brand-gold/90 text-slate-900 px-12 py-5 rounded-[1.8rem] text-[11px] font-black uppercase tracking-widest flex items-center gap-3 shadow-2xl shadow-brand-gold/20 active:scale-95 transition-all group"
             >
-              Launch Campaign
-              <Play size={18} fill="currentColor" />
+              Launch Broadcast
+              <Send size={20} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
             </button>
           )}
         </div>
