@@ -6,38 +6,101 @@ import {
   RefreshCw, Trash2, 
   X, QrCode, MonitorSmartphone,
   ShieldCheck, Info,
-  AlertCircle
+  AlertCircle, Loader2
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 import { cn } from '@/lib/utils';
+import QRCode from 'react-qr-code';
+import { toast } from 'sonner';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function DevicesPage() {
-  const [devices, setDevices] = useState([
-    { id: '1', name: 'Mobile-01 SIM-1', number: '+91-98765-12345', status: 'online', msgsToday: 47 },
-    { id: '2', name: 'Mobile-01 SIM-2', number: '+91-98765-67890', status: 'online', msgsToday: 23 },
-    { id: '3', name: 'Mobile-02 SIM-1', number: '+91-88888-11111', status: 'offline', lastSeen: '2h ago', msgsToday: 0 },
-  ]);
+  const [devices, setDevices] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showQR, setShowQR] = useState(false);
   const [qrCode, setQrCode] = useState(null);
   const [deviceName, setDeviceName] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [activeSessionId, setActiveSessionId] = useState(null);
 
-  // Mock Socket Connection
   useEffect(() => {
-    const socket = io('http://localhost:3001');
+    fetchDevices();
+    const socket = io(API_URL);
+    
     socket.on('device:status', ({ sessionId, status }) => {
-      setDevices(prev => prev.map(d => d.id === sessionId ? { ...d, status } : d));
+      setDevices(prev => prev.map(d => d.sessionId === sessionId ? { ...d, status } : d));
     });
+
     return () => { socket.disconnect(); };
   }, []);
 
+  const fetchDevices = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/sessions`);
+      const data = await res.json();
+      setDevices(data);
+    } catch (e) {
+      toast.error('Failed to load devices');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAddDevice = () => {
-    setIsGenerating(true);
+    setDeviceName(`Node-${devices.length + 1}`);
     setShowQR(true);
-    setTimeout(() => {
-      setQrCode('MOCK_QR_DATA');
+    setQrCode(null);
+    setIsGenerating(false);
+  };
+
+  const generateQR = async () => {
+    if (!deviceName) return toast.error('Please name your instance');
+    setIsGenerating(true);
+    const sessionId = `sid_${Date.now()}`;
+    setActiveSessionId(sessionId);
+
+    try {
+      const res = await fetch(`${API_URL}/api/session/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, name: deviceName })
+      });
+      
+      const socket = io(API_URL);
+      socket.on(`qr:${sessionId}`, ({ qr }) => {
+        setQrCode(qr);
+        setIsGenerating(false);
+      });
+
+      socket.on('device:status', ({ sessionId: sid, status }) => {
+        if (sid === sessionId && status === 'online') {
+          setShowQR(false);
+          fetchDevices();
+          toast.success('WhatsApp Linked Successfully! ✅');
+          socket.disconnect();
+        }
+      });
+
+    } catch (e) {
+      toast.error('Failed to start session');
       setIsGenerating(false);
-    }, 2000);
+    }
+  };
+
+  const deleteDevice = async (sessionId) => {
+    if (!confirm('Are you sure? This will disconnect the WhatsApp session.')) return;
+    try {
+      await fetch(`${API_URL}/api/session/delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId })
+      });
+      setDevices(prev => prev.filter(d => d.sessionId !== sessionId));
+      toast.success('Session deleted');
+    } catch (e) {
+      toast.error('Delete failed');
+    }
   };
 
   return (
@@ -68,95 +131,74 @@ export default function DevicesPage() {
 
       {/* Stats Bar */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-         {[
-           { label: 'Total Instances', value: '47', sub: 'Linked Numbers', color: 'text-slate-900' },
-           { label: 'Active Sync', value: '42', sub: 'Nodes Online', color: 'text-emerald-500' },
-           { label: 'Faulty Nodes', value: '05', sub: 'Requires Scan', color: 'text-rose-500' },
-         ].map((s, i) => (
-           <div key={i} className="p-8 bg-white border border-slate-100 rounded-[2rem] shadow-sm flex flex-col items-center text-center space-y-1">
-              <span className={cn("text-4xl font-black tracking-tighter", s.color)}>{s.value}</span>
-              <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">{s.label}</span>
-              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tight">{s.sub}</span>
-           </div>
-         ))}
-      </div>
-
-      {/* Filter & Search */}
-      <div className="flex flex-col md:flex-row gap-4 bg-white p-2 rounded-[2.5rem] border border-slate-100 shadow-sm">
-        <div className="flex-1 relative group">
-          <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-brand-gold transition-colors" size={20} />
-          <input 
-            type="text" 
-            placeholder="Search infrastructure by name or number..." 
-            className="w-full bg-slate-50 border border-transparent rounded-[2rem] py-5 pl-14 pr-6 text-sm font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:bg-white focus:border-brand-gold/20 transition-all"
-          />
-        </div>
-        <div className="flex gap-2">
-           {['All Nodes', 'Online', 'Offline'].map((f, i) => (
-             <button key={i} className={cn(
-               "px-6 py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all",
-               i === 0 ? "bg-slate-900 text-white shadow-lg shadow-slate-900/20" : "bg-slate-50 text-slate-400 hover:text-slate-600"
-             )}>
-               {f}
-             </button>
-           ))}
-        </div>
+        {[
+          { label: 'Total Capacity', value: devices.length, icon: MonitorSmartphone, color: 'bg-slate-900' },
+          { label: 'Online Nodes', value: devices.filter(d => d.status === 'online').length, icon: ShieldCheck, color: 'bg-emerald-500' },
+          { label: 'Avg Latency', value: '14ms', icon: RefreshCw, color: 'bg-brand-gold' },
+        ].map((stat, i) => (
+          <div key={i} className="bg-white border border-slate-100 rounded-[2.5rem] p-8 flex items-center gap-6 shadow-sm group hover:shadow-xl transition-all duration-500">
+            <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-lg", stat.color)}>
+              <stat.icon size={24} />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
+              <h3 className="text-3xl font-black text-slate-900 tracking-tighter">{stat.value}</h3>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Device Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-        {devices.map((device, i) => (
+        {loading ? (
+          <div className="col-span-full py-20 text-center text-slate-300 font-black uppercase tracking-widest animate-pulse">Syncing Node Database...</div>
+        ) : devices.map((device, i) => (
           <motion.div
             key={device.id}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
-            className="bg-white border border-slate-100 rounded-[2.5rem] p-8 flex flex-col justify-between group relative overflow-hidden hover:shadow-2xl hover:shadow-slate-200/50 transition-all duration-500"
+            className="group relative bg-white border border-slate-100 rounded-[3rem] p-10 shadow-sm hover:shadow-2xl hover:shadow-slate-200/50 transition-all duration-700 overflow-hidden"
           >
-            {/* Background Decorative */}
-            <div className={cn(
-              "absolute -top-16 -right-16 w-32 h-32 rounded-full blur-3xl opacity-10 transition-all duration-700",
-              device.status === 'online' ? 'bg-emerald-500' : 'bg-rose-500'
-            )} />
-
-            <div className="relative">
-              <div className="flex justify-between items-start mb-8">
-                <div className={cn(
-                  "w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-500 group-hover:rotate-6 group-hover:scale-110",
-                  device.status === 'online' ? 'bg-slate-900 text-brand-gold shadow-slate-900/10' : 'bg-slate-100 text-slate-400 border border-slate-200 shadow-none'
-                )}>
-                  <MonitorSmartphone size={28} />
-                </div>
-                <div className={cn(
-                  "flex items-center gap-2 px-3 py-1 rounded-full border shadow-sm",
-                  device.status === 'online' ? "bg-emerald-50 border-emerald-100" : "bg-rose-50 border-rose-100"
-                )}>
-                  <div className={cn("w-2 h-2 rounded-full", device.status === 'online' ? "bg-emerald-500 animate-pulse" : "bg-rose-500")} />
-                  <span className={cn("text-[9px] font-black uppercase tracking-widest", device.status === 'online' ? "text-emerald-600" : "text-rose-600")}>
-                    {device.status}
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-1 mb-10">
-                <h3 className="text-xl font-black text-slate-900 truncate tracking-tight">{device.name}</h3>
-                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                  <ShieldCheck className="w-3 h-3 text-brand-gold" /> {device.number}
-                </p>
-              </div>
+            <div className="absolute top-0 right-0 p-8">
+               <div className={cn(
+                 "px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border",
+                 device.status === 'online' ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-rose-50 text-rose-500 border-rose-100"
+               )}>
+                 {device.status}
+               </div>
             </div>
 
-            <div className="relative">
+            <div className="space-y-8 relative z-10">
+              <div className="flex items-center gap-6">
+                <div className={cn(
+                  "w-16 h-16 rounded-[2rem] flex items-center justify-center shadow-2xl transition-all duration-700 group-hover:rotate-12",
+                  device.status === 'online' ? "bg-slate-900 text-brand-gold shadow-slate-900/20" : "bg-slate-50 text-slate-300"
+                )}>
+                  <Building2 size={32} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-900 tracking-tighter">{device.name}</h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">{device.sessionId}</p>
+                </div>
+              </div>
+
               <div className="flex justify-between items-end border-t border-slate-50 pt-6">
                 <div>
                   <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em] mb-1">Messages Processed</p>
-                  <p className="text-3xl font-black text-slate-900 tracking-tighter">{device.msgsToday || 0}</p>
+                  <p className="text-3xl font-black text-slate-900 tracking-tighter">0</p>
                 </div>
                 <div className="flex gap-3">
-                  <button className="p-3 bg-slate-50 text-slate-400 hover:text-brand-gold hover:bg-white border border-transparent hover:border-slate-100 rounded-2xl transition-all shadow-sm active:scale-90">
-                    <RefreshCw size={18} />
+                  <button 
+                    onClick={() => { setShowQR(true); setActiveSessionId(device.sessionId); setQrCode(null); }}
+                    className="p-3 bg-slate-50 text-slate-400 hover:text-brand-gold hover:bg-white border border-transparent hover:border-slate-100 rounded-2xl transition-all shadow-sm active:scale-90"
+                  >
+                    <QrCode size={18} />
                   </button>
-                  <button className="p-3 bg-slate-50 text-slate-400 hover:text-rose-500 hover:bg-white border border-transparent hover:border-slate-100 rounded-2xl transition-all shadow-sm active:scale-90">
+                  <button 
+                    onClick={() => deleteDevice(device.sessionId)}
+                    className="p-3 bg-slate-50 text-slate-400 hover:text-rose-500 hover:bg-white border border-transparent hover:border-slate-100 rounded-2xl transition-all shadow-sm active:scale-90"
+                  >
                     <Trash2 size={18} />
                   </button>
                 </div>
@@ -165,7 +207,6 @@ export default function DevicesPage() {
           </motion.div>
         ))}
 
-        {/* Add Skeleton */}
         <button 
           onClick={handleAddDevice}
           className="border-2 border-dashed border-slate-100 bg-slate-50/30 rounded-[2.5rem] p-10 flex flex-col items-center justify-center gap-6 text-slate-300 hover:border-brand-gold/30 hover:text-brand-gold hover:bg-white transition-all group shadow-sm hover:shadow-xl hover:shadow-slate-100 duration-500"
@@ -198,9 +239,6 @@ export default function DevicesPage() {
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               className="relative w-full max-w-xl bg-white rounded-[3rem] p-12 overflow-hidden shadow-2xl border border-slate-100"
             >
-              {/* Decorative Blur */}
-              <div className="absolute -top-40 -left-40 w-80 h-80 bg-brand-gold/10 rounded-full blur-[100px]" />
-
               <div className="flex justify-between items-start mb-10">
                 <div>
                   <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Link <span className="text-brand-gold">Instance</span></h2>
@@ -214,72 +252,44 @@ export default function DevicesPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                 <div className="space-y-8">
                    <div className="space-y-3">
-                      <div className="flex items-center gap-2">
-                        <Info size={14} className="text-brand-gold" />
-                        <label className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Instance Label</label>
-                      </div>
+                      <label className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Instance Label</label>
                       <input 
                         type="text" 
                         placeholder="e.g. Node-01 SIM-1"
-                        className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-5 px-6 text-sm font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-brand-gold/30 focus:bg-white transition-all shadow-sm"
+                        className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-5 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:border-brand-gold/30 transition-all shadow-sm"
                         value={deviceName}
                         onChange={(e) => setDeviceName(e.target.value)}
                       />
                    </div>
 
-                   <div className="space-y-4">
-                      <div className="flex items-center gap-2">
-                         <AlertCircle size={14} className="text-brand-gold" />
-                         <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Instructions</span>
-                      </div>
-                      <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 space-y-4">
-                        {[
-                          'Open WhatsApp on your mobile phone',
-                          'Navigate to Linked Devices in Settings',
-                          'Link a Device and point camera at the QR'
-                        ].map((step, i) => (
-                          <div key={i} className="flex gap-4 items-start">
-                             <div className="w-5 h-5 rounded-lg bg-slate-900 text-brand-gold flex items-center justify-center text-[10px] font-black shrink-0">{i+1}</div>
-                             <p className="text-[11px] font-medium text-slate-600 leading-tight">{step}</p>
-                          </div>
-                        ))}
-                      </div>
-                   </div>
+                   <button 
+                    onClick={generateQR}
+                    disabled={isGenerating}
+                    className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-slate-900/20 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                   >
+                     {isGenerating ? <Loader2 size={18} className="animate-spin text-brand-gold" /> : <QrCode size={18} className="text-brand-gold" />}
+                     Generate QR
+                   </button>
                 </div>
 
-                <div className="space-y-6">
-                   <div className="aspect-square bg-white border border-slate-100 rounded-[2.5rem] p-8 flex flex-col items-center justify-center relative overflow-hidden group shadow-xl shadow-slate-200/30">
-                     {isGenerating ? (
-                       <div className="flex flex-col items-center gap-4 text-slate-900 text-center">
-                         <RefreshCw className="animate-spin text-brand-gold" size={40} />
-                         <div className="space-y-1">
-                            <span className="text-[11px] font-black uppercase tracking-widest">Syncing Nodes...</span>
-                            <p className="text-[9px] font-bold text-slate-400 uppercase">Handshaking with WA Servers</p>
-                         </div>
-                       </div>
-                     ) : qrCode ? (
-                       <div className="w-full h-full flex flex-col items-center justify-center">
-                         <QrCode size={240} className="text-slate-900" />
-                         <div className="absolute top-4 right-4 bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full border border-emerald-100 text-[9px] font-black uppercase tracking-widest">Live QR</div>
-                       </div>
-                     ) : (
-                       <button className="flex flex-col items-center gap-4 text-slate-300 group-hover:text-brand-gold transition-colors">
-                         <QrCode size={64} strokeWidth={1} />
-                         <span className="text-[10px] font-black uppercase tracking-widest">Click to Start Sync</span>
-                       </button>
-                     )}
-                   </div>
-                   <div className="flex items-center justify-center gap-4">
-                      <div className="h-2 flex-1 bg-slate-50 rounded-full overflow-hidden">
-                         <motion.div 
-                           initial={{ width: "100%" }}
-                           animate={{ width: "0%" }}
-                           transition={{ duration: 60, ease: "linear" }}
-                           className="h-full bg-brand-gold"
-                         />
+                <div className="flex flex-col items-center justify-center bg-slate-50 rounded-[2.5rem] p-8 border border-slate-100 min-h-[250px]">
+                   {qrCode ? (
+                     <div className="p-4 bg-white rounded-2xl shadow-xl">
+                        <QRCode value={qrCode} size={180} />
+                     </div>
+                   ) : isGenerating ? (
+                      <div className="flex flex-col items-center gap-4">
+                         <div className="w-12 h-12 border-4 border-slate-200 border-t-brand-gold rounded-full animate-spin" />
+                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Waiting for QR...</p>
                       </div>
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest w-12 text-right">0:59</span>
-                   </div>
+                   ) : (
+                     <div className="text-center space-y-4">
+                        <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto text-slate-200">
+                           <QrCode size={32} />
+                        </div>
+                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Click button to generate</p>
+                     </div>
+                   )}
                 </div>
               </div>
             </motion.div>

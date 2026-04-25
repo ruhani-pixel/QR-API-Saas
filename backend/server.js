@@ -134,6 +134,24 @@ app.get('/api/sessions', async (req, res) => {
   }
 });
 
+app.get('/api/messages', async (req, res) => {
+  try {
+    const { sessionId, remoteJid } = req.query;
+    const where = {};
+    if (sessionId) where.sessionId = sessionId;
+    if (remoteJid) where.remoteJid = remoteJid;
+
+    const messages = await prisma.message.findMany({
+      where,
+      orderBy: { timestamp: 'desc' },
+      take: 50
+    });
+    res.json(messages);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ─── CAMPAIGN ROUTES ───
 
 app.post('/api/campaign/start', async (req, res) => {
