@@ -38,7 +38,7 @@ const upload = multer({ storage });
 const whatsapp = new Whatsapp({
   adapter: new SQLiteAdapter({ databasePath: './sessions.db' }),
   debugLevel: 'silent',
-  autoLoad: false,
+  autoLoad: true,
   onQRUpdated: async (args) => {
     let sid = args?.sessionId || '';
     let qr = args?.qr || '';

@@ -27,7 +27,6 @@ export function Sidebar({ isCollapsed }: any) {
   const managementLinks = [
     { href: '/ai-config', label: 'AI Setup', icon: Bot },
     { href: '/bulk', label: 'Bulk Sender', icon: Zap },
-    { href: '/analytics', label: 'Statistics', icon: BarChart2 },
     { href: '/settings', label: 'Settings', icon: Settings },
   ];
 
