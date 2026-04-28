@@ -64,9 +64,11 @@ const whatsapp = new Whatsapp({
     
     if (cleanSid) {
       console.log(`[SESSION] Connected: ${cleanSid}`);
-      retryCounts[cleanSid] = 0; // Reset retries on success
-      // First update DB, then emit to ensure frontend polling sees it
-      await updateDeviceStatus(cleanSid, 'online', true);
+      retryCounts[cleanSid] = 0;
+      await prisma.device.update({ 
+        where: { sessionId: cleanSid }, 
+        data: { status: 'online', currentQR: null } 
+      }).catch(() => {});
       io.emit('device:status', { sessionId: cleanSid, status: 'online' });
     }
   },
@@ -310,8 +312,16 @@ async function updateDeviceStatus(sessionId, status, clearQR = false) {
   try {
     const data = { status };
     if (clearQR) data.currentQR = null;
-    await prisma.device.upsert({ where: { sessionId }, update: data, create: { sessionId, name: `Node ${sessionId}`, status, currentQR: null } });
-  } catch (e) {}
+    
+    // CRITICAL: Use update, NOT upsert. 
+    // If device was deleted, don't let background events re-create it.
+    await prisma.device.update({ 
+      where: { sessionId }, 
+      data 
+    });
+  } catch (e) {
+    // Silently fail if device doesn't exist (e.g. deleted)
+  }
 }
 
 // ENDPOINTS

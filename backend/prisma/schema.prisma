@@ -29,6 +29,7 @@ model Device {
   updatedAt      DateTime @updatedAt
   messages       MessageLog[]
   chatMessages   Message[]
+  contacts       Contact[]
 }
 
 model Campaign {
@@ -100,6 +101,8 @@ model Contact {
   profilePic       String?
   aiEnabled        Boolean   @default(true)
   updatedAt        DateTime  @updatedAt
+
+  device           Device    @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
 
   @@unique([sessionId, remoteJid])
 }
