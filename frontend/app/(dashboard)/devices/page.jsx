@@ -55,9 +55,26 @@ export default function DevicesPage() {
         setCountdown(60);
         
         if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+        
+        // Start polling for status when QR is shown
+        const pollInterval = setInterval(async () => {
+          try {
+            const res = await fetch(`${API_URL}/api/sessions`);
+            const data = await res.json();
+            const currentDevice = data.find(d => String(d.sessionId).toLowerCase() === incomingSid);
+            if (currentDevice && currentDevice.status === 'online') {
+              clearInterval(pollInterval);
+              clearInterval(countdownIntervalRef.current);
+              setModalStep('success');
+              fetchDevices();
+            }
+          } catch (e) {}
+        }, 3000);
+
         countdownIntervalRef.current = setInterval(() => {
           setCountdown(prev => {
             if (prev <= 1) {
+              clearInterval(pollInterval);
               clearInterval(countdownIntervalRef.current);
               setQrCode(null);
               setIsGenerating(false);
