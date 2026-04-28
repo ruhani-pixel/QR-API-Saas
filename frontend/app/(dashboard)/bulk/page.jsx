@@ -10,7 +10,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
-const API_URL = 'http://localhost:3001';
+import { API_URL } from '@/lib/apiConfig';
 
 export default function BulkMessagingPage() {
   const [step, setStep] = useState(1);

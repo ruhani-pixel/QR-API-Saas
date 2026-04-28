@@ -40,13 +40,11 @@ export default function DevicesPage() {
     
     setSocketConnected(socket.connected);
 
-    socket.on('connect', () => {
-      setSocketConnected(true);
-    });
+    const onConnect = () => setSocketConnected(true);
+    const onDisconnect = () => setSocketConnected(false);
 
-    socket.on('disconnect', () => {
-      setSocketConnected(false);
-    });
+    socket.on('connect', onConnect);
+    socket.on('disconnect', onDisconnect);
 
     socket.on('qr', (data) => {
       const incomingSid = String(data?.sessionId || '').toLowerCase();
@@ -86,10 +84,10 @@ export default function DevicesPage() {
     });
 
     return () => { 
+      socket.off('connect', onConnect);
+      socket.off('disconnect', onDisconnect);
       socket.off('qr');
       socket.off('device:status');
-      socket.off('connect');
-      socket.off('disconnect');
       if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
     };
   }, []);
