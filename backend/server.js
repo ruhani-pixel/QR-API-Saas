@@ -49,15 +49,21 @@ const whatsapp = new Whatsapp({
       io.emit('qr', { sessionId: sid, qr });
     }
   },
-  onConnected: (sessionId) => {
-    // Normalizing sessionId: it could be an object { sessionId: '...' } or a string
+  onAuthenticated: (sessionId) => {
+    const sid = typeof sessionId === 'object' ? sessionId.sessionId : sessionId;
+    const cleanSid = String(sid || '').toLowerCase();
+    console.log(`[SESSION] Authenticated: ${cleanSid}`);
+    io.emit('device:status', { sessionId: cleanSid, status: 'connecting' });
+  },
+  onConnected: async (sessionId) => {
     const sid = typeof sessionId === 'object' ? sessionId.sessionId : sessionId;
     const cleanSid = String(sid || '').toLowerCase();
     
     if (cleanSid) {
       console.log(`[SESSION] Connected: ${cleanSid}`);
+      // First update DB, then emit to ensure frontend polling sees it
+      await updateDeviceStatus(cleanSid, 'online', true);
       io.emit('device:status', { sessionId: cleanSid, status: 'online' });
-      updateDeviceStatus(cleanSid, 'online', true);
     }
   },
   onMessageUpdated: (data) => {
@@ -80,8 +86,21 @@ const whatsapp = new Whatsapp({
     const cleanSid = String((typeof sessionId === 'object' ? sessionId.sessionId : sessionId) || '').toLowerCase();
     if (cleanSid) {
       console.log(`[SESSION] Disconnected: ${cleanSid} (Reason: ${reason})`);
-      io.emit('device:status', { sessionId: cleanSid, status: 'offline' });
-      updateDeviceStatus(cleanSid, 'offline');
+      
+      // Codes like 515 (Restarting), 440 (Stream error) are temporary.
+      // Auto-retrigger connection instead of staying offline.
+      const isTemporary = [515, 440, 503, 500].includes(Number(reason)) || !reason;
+      
+      if (isTemporary) {
+        console.log(`[SESSION] Attempting Auto-recovery for ${cleanSid}...`);
+        updateDeviceStatus(cleanSid, 'connecting');
+        setTimeout(() => {
+          whatsapp.startSession(cleanSid).catch(() => {});
+        }, 2500);
+      } else {
+        io.emit('device:status', { sessionId: cleanSid, status: 'offline' });
+        updateDeviceStatus(cleanSid, 'offline');
+      }
     }
   },
   onMessageReceived: async (msg) => {
@@ -302,6 +321,12 @@ app.post('/api/session/delete', async (req, res) => {
 app.get('/api/sessions', async (req, res) => {
   const sessions = await prisma.device.findMany();
   res.json(sessions);
+});
+
+app.get('/api/session/status/:sessionId', async (req, res) => {
+  const { sessionId } = req.params;
+  const device = await prisma.device.findUnique({ where: { sessionId } });
+  res.json({ status: device?.status || 'offline' });
 });
 
 app.post('/api/campaign/create', upload.single('media'), async (req, res) => {

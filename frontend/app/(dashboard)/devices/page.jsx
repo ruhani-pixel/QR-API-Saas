@@ -27,6 +27,7 @@ export default function DevicesPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [socketConnected, setSocketConnected] = useState(false);
+  const [provisioningStatus, setProvisioningStatus] = useState('Generating QR...');
   
   // Confirmation state
   const [confirmAction, setConfirmAction] = useState(null); // { type: 'unlink' | 'delete', id: string, name: string }
@@ -50,30 +51,41 @@ export default function DevicesPage() {
       const incomingSid = String(data?.sessionId || '').toLowerCase();
       const currentSid = String(activeSessionIdRef.current || '').toLowerCase();
       if (incomingSid === currentSid) {
+        setProvisioningStatus('Ready to Scan');
         setQrCode(data?.qr);
         setIsGenerating(false);
         setCountdown(60);
         
         if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
         
-        // Start polling for status when QR is shown
+        console.log(`[POLLING] Started for ${incomingSid}`);
         const pollInterval = setInterval(async () => {
           try {
-            const res = await fetch(`${API_URL}/api/sessions`);
-            const data = await res.json();
-            const currentDevice = data.find(d => String(d.sessionId).toLowerCase() === incomingSid);
-            if (currentDevice && currentDevice.status === 'online') {
+            const res = await fetch(`${API_URL}/api/session/status/${incomingSid}`);
+            const { status } = await res.json();
+            console.log(`[POLLING] Status for ${incomingSid}: ${status}`);
+            
+            if (status === 'online') {
+              setProvisioningStatus('Connected Successfully!');
+              console.log(`[POLLING] Success! Switching to success step.`);
               clearInterval(pollInterval);
-              clearInterval(countdownIntervalRef.current);
+              if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
               setModalStep('success');
               fetchDevices();
+            } else if (status === 'connecting') {
+              setProvisioningStatus('Authenticating / Syncing...');
+            } else if (status === 'offline') {
+              setProvisioningStatus('Waiting for Scan...');
             }
-          } catch (e) {}
-        }, 3000);
+          } catch (e) {
+            console.error('[POLLING] Error:', e);
+          }
+        }, 2000); // Polling every 2 seconds for faster response
 
         countdownIntervalRef.current = setInterval(() => {
           setCountdown(prev => {
             if (prev <= 1) {
+              console.log(`[POLLING] QR Expired, stopping polling.`);
               clearInterval(pollInterval);
               clearInterval(countdownIntervalRef.current);
               setQrCode(null);
@@ -139,6 +151,7 @@ export default function DevicesPage() {
     setIsGenerating(true);
     setQrCode(null);
     setCountdown(60);
+    setProvisioningStatus('Initializing Engine...');
 
     try {
       await fetch(`${API_URL}/api/session/start`, {

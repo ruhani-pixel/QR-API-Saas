@@ -21,21 +21,31 @@ const BRAND = {
   slate900: '#0F172A'
 };
 
+interface Device {
+  sessionId: string;
+  name?: string;
+  status?: string;
+  aiEnabled?: boolean;
+  aiInstructions?: string;
+  aiReplyNewUsers?: boolean;
+  aiReplyExistingUsers?: boolean;
+}
+
 export default function AIConfigPage() {
-  const [devices, setDevices] = useState([]);
-  const [selectedNode, setSelectedNode] = useState(null);
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [selectedNode, setSelectedNode] = useState<Device | null>(null);
   const [instructions, setInstructions] = useState('');
   const [originalInstructions, setOriginalInstructions] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [testMessage, setTestMessage] = useState('');
-  const [testChat, setTestChat] = useState([]);
+  const [testChat, setTestChat] = useState<any[]>([]);
   
   const [aiEnabled, setAiEnabled] = useState(false);
   const [aiReplyNewUsers, setAiReplyNewUsers] = useState(true);
   const [aiReplyExistingUsers, setAiReplyExistingUsers] = useState(true);
 
-  const chatEndRef = useRef(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchDevices();
@@ -63,6 +73,7 @@ export default function AIConfigPage() {
   };
 
   const handleSave = async () => {
+    if (!selectedNode) return;
     setIsSaving(true);
     try {
       await fetch(`${API_URL}/api/ai/config`, {
