@@ -60,18 +60,14 @@ const whatsapp = new Whatsapp({
   onMessageReceived: async (msg) => {
     await saveOrUpdateMessage(msg);
     io.emit('message:incoming', msg);
+    // Background sync profile pic on new message
+    syncProfilePic(msg.sessionId, msg.key.remoteJid);
   },
   onHistoryReceived: async (data) => {
-    // Aggressive Contact Sync from History
     if (data.contacts) {
       for (const contact of data.contacts) {
         const name = contact.name || contact.verifiedName || contact.notify || contact.shortName;
-        if (name) {
-          await updateContact(data.sessionId, contact.id, { 
-            name: contact.name || contact.verifiedName || contact.shortName, 
-            pushName: contact.notify 
-          });
-        }
+        if (name) await updateContact(data.sessionId, contact.id, { name: contact.name || contact.verifiedName || contact.shortName, pushName: contact.notify });
       }
     }
     for (const msg of data.messages) await saveOrUpdateMessage(msg);
@@ -87,8 +83,6 @@ const whatsapp = new Whatsapp({
 
 async function updateContact(sessionId, remoteJid, data) {
   try {
-    // Clean data to avoid nulls overwriting good data
-    const existing = await prisma.contact.findUnique({ where: { sessionId_remoteJid: { sessionId, remoteJid } } });
     const updateData = {};
     if (data.name) updateData.name = data.name;
     if (data.pushName) updateData.pushName = data.pushName;
@@ -101,8 +95,6 @@ async function updateContact(sessionId, remoteJid, data) {
     });
   } catch (e) {}
 }
-
-const statusMap = { 0: 'pending', 1: 'server', 2: 'delivered', 3: 'read', 4: 'played' };
 
 async function saveOrUpdateMessage(msg) {
   try {
@@ -165,38 +157,35 @@ async function saveOrUpdateMessage(msg) {
   } catch (e) {}
 }
 
+const statusMap = { 0: 'pending', 1: 'server', 2: 'delivered', 3: 'read', 4: 'played' };
+
 function formatPhoneNumber(jid) {
   const num = jid.split('@')[0];
   if (num.length < 5) return num;
-  if (num.includes('-')) return num; // Group ID
-  return `+${num.slice(0, 2)} ${num.slice(2, 7)} ${num.slice(7)}`;
+  if (num.includes('-')) return num; // Group
+  if (num.length > 15) return 'WhatsApp User'; // Filter out crazy long internal IDs
+  // Indian format
+  if (num.startsWith('91') && num.length === 12) {
+    return `+91 ${num.slice(2, 7)} ${num.slice(7)}`;
+  }
+  return `+${num}`;
 }
 
-app.post('/api/session/start', async (req, res) => {
-  const { sessionId, name } = req.body;
+async function syncProfilePic(sessionId, remoteJid) {
   try {
-    await prisma.device.upsert({ where: { sessionId }, update: { name, status: 'connecting' }, create: { sessionId, name, status: 'connecting' } });
-    await whatsapp.startSession(sessionId);
-    res.json({ success: true });
-  } catch (error) { res.status(500).json({ error: error.message }); }
-});
-
-app.post('/api/session/delete', async (req, res) => {
-  const { sessionId } = req.body;
-  try {
-    await whatsapp.terminateSession(sessionId).catch(() => {});
-    await prisma.message.deleteMany({ where: { sessionId } });
-    await prisma.contact.deleteMany({ where: { sessionId } });
-    await prisma.device.delete({ where: { sessionId } });
-    res.json({ success: true });
-  } catch (error) { res.status(500).json({ error: error.message }); }
-});
+    const session = await whatsapp.getSessionById(sessionId);
+    if (!session) return;
+    const url = await session.sock.profilePictureUrl(remoteJid, 'image').catch(() => null);
+    if (url) await updateContact(sessionId, remoteJid, { profilePic: url });
+  } catch (e) {}
+}
 
 app.get('/api/whatsapp/chats', async (req, res) => {
   try {
     const { sessionId } = req.query;
-    const messages = await prisma.message.findMany({ where: sessionId ? { sessionId } : {}, orderBy: { timestamp: 'desc' } });
-    const contacts = await prisma.contact.findMany({ where: sessionId ? { sessionId } : {} });
+    if (!sessionId) return res.json([]);
+    const messages = await prisma.message.findMany({ where: { sessionId }, orderBy: { timestamp: 'desc' } });
+    const contacts = await prisma.contact.findMany({ where: { sessionId } });
     const contactMap = new Map(contacts.map(c => [c.remoteJid, c]));
     const uniqueChats = [];
     const seenJids = new Set();
@@ -223,6 +212,17 @@ app.get('/api/whatsapp/chats', async (req, res) => {
     }
     res.json(uniqueChats);
   } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.get('/api/whatsapp/profile-pic', async (req, res) => {
+  const { sessionId, remoteJid } = req.query;
+  try {
+    const session = await whatsapp.getSessionById(sessionId);
+    if (!session) return res.json({ url: null });
+    const url = await session.sock.profilePictureUrl(remoteJid, 'image').catch(() => null);
+    if (url) await updateContact(sessionId, remoteJid, { profilePic: url });
+    res.json({ url });
+  } catch (e) { res.json({ url: null }); }
 });
 
 app.get('/api/whatsapp/messages', async (req, res) => {
@@ -260,6 +260,26 @@ app.post('/api/message/send-media', upload.single('media'), async (req, res) => 
 app.get('/api/sessions', async (req, res) => {
   const sessions = await prisma.device.findMany();
   res.json(sessions);
+});
+
+app.post('/api/session/start', async (req, res) => {
+  const { sessionId, name } = req.body;
+  try {
+    await prisma.device.upsert({ where: { sessionId }, update: { name, status: 'connecting' }, create: { sessionId, name, status: 'connecting' } });
+    await whatsapp.startSession(sessionId);
+    res.json({ success: true });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.post('/api/session/delete', async (req, res) => {
+  const { sessionId } = req.body;
+  try {
+    await whatsapp.terminateSession(sessionId).catch(() => {});
+    await prisma.message.deleteMany({ where: { sessionId } });
+    await prisma.contact.deleteMany({ where: { sessionId } });
+    await prisma.device.delete({ where: { sessionId } });
+    res.json({ success: true });
+  } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 async function updateDeviceStatus(sessionId, status, clearQR = false) {
