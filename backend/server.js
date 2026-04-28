@@ -71,19 +71,19 @@ const whatsapp = new Whatsapp({
   },
   onConnected: (sessionId) => {
     const sid = typeof sessionId === 'string' ? sessionId : sessionId.sessionId || String(sessionId);
-    console.log(`[Session:${sid}] Connected ✅`);
+    console.log(`[Session:${sid}] Connected ✅ - Emitting online status`);
     io.emit('device:status', { sessionId: sid, status: 'online' });
     updateDeviceStatus(sid, 'online', true); // true to clear QR
   },
-  onDisconnected: (sessionId) => {
+  onDisconnected: (sessionId, reason) => {
     const sid = typeof sessionId === 'string' ? sessionId : sessionId.sessionId || String(sessionId);
-    console.log(`[Session:${sid}] Disconnected ❌`);
+    console.log(`[Session:${sid}] Disconnected ❌ - Reason/Code:`, reason);
     io.emit('device:status', { sessionId: sid, status: 'offline' });
     updateDeviceStatus(sid, 'offline');
   },
   onConnecting: (sessionId) => {
     const sid = typeof sessionId === 'string' ? sessionId : sessionId.sessionId || String(sessionId);
-    console.log(`[Session:${sid}] Connecting...`);
+    console.log(`[Session:${sid}] Connecting... ⏳`);
     io.emit('device:status', { sessionId: sid, status: 'connecting' });
     updateDeviceStatus(sid, 'connecting');
   },
@@ -210,6 +210,22 @@ app.post('/api/session/start', async (req, res) => {
   }
 });
 
+app.post('/api/session/logout', async (req, res) => {
+  const { sessionId } = req.body;
+  try {
+    try {
+      await whatsapp.deleteSession(sessionId);
+    } catch(e) {}
+    await prisma.device.update({
+      where: { sessionId },
+      data: { status: 'offline', currentQR: null }
+    });
+    res.json({ success: true, message: 'Session unlinked' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.post('/api/session/delete', async (req, res) => {
   const { sessionId } = req.body;
   try {
@@ -219,7 +235,7 @@ app.post('/api/session/delete', async (req, res) => {
     await prisma.device.delete({
       where: { sessionId }
     });
-    res.json({ success: true, message: 'Session deleted' });
+    res.json({ success: true, message: 'Node deleted successfully' });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -247,6 +263,42 @@ app.post('/api/session/bulk-delete', async (req, res) => {
   }
   
   res.json({ success: true, message: `Successfully deleted ${deletedCount} sessions.` });
+});
+
+app.get('/api/whatsapp/chats', async (req, res) => {
+  try {
+    const { sessionId } = req.query;
+    const where = sessionId ? { sessionId } : {};
+    
+    // Fetch unique chats by grouping messages by remoteJid
+    // We'll take the latest message for each chat
+    const messages = await prisma.message.findMany({
+      where,
+      orderBy: { timestamp: 'desc' }
+    });
+
+    const uniqueChats = [];
+    const seenJids = new Set();
+
+    for (const msg of messages) {
+      if (!seenJids.has(msg.remoteJid)) {
+        seenJids.add(msg.remoteJid);
+        uniqueChats.push({
+          id: msg.remoteJid,
+          name: msg.pushName || msg.remoteJid.split('@')[0],
+          lastMessage: msg.content,
+          timestamp: msg.timestamp,
+          unreadCount: 0, // Simplified for now
+          status: msg.status,
+          sessionId: msg.sessionId
+        });
+      }
+    }
+
+    res.json(uniqueChats);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 app.get('/api/sessions', async (req, res) => {

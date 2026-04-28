@@ -24,7 +24,7 @@ export default function DashboardLayout({
           {!isInbox && <Header />}
           <main className={cn(
             "flex-1 overflow-y-auto scroll-smooth no-scrollbar",
-            isInbox ? "p-0" : "p-6"
+            isInbox ? "p-0" : "p-4"
           )}>
             {children}
           </main>

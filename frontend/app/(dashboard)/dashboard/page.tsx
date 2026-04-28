@@ -10,10 +10,11 @@ import {
   MessageSquare, Send, AlertTriangle, 
   Users, Zap, ShieldCheck, 
   BarChart3, Activity, Globe,
-  ArrowUpRight, Clock
+  ArrowUpRight, Clock, Calendar, MoreHorizontal, ChevronRight, ChevronDown
 } from 'lucide-react';
 import { ExportButton } from '@/components/ui/ExportButton';
 import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -26,163 +27,175 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-1000 max-w-[1600px] mx-auto px-6 lg:px-12 pb-24 selection:bg-brand-gold/20">
+    <div className="space-y-8 animate-in fade-in duration-1000 max-w-[1600px] mx-auto px-8 pb-12">
       
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 pt-4">
-        <div className="space-y-2">
-          <div className="flex items-center gap-3 mb-2">
-             <div className="flex items-center gap-2 px-4 py-1.5 bg-slate-900 rounded-full border border-slate-800 shadow-xl shadow-slate-900/10 group cursor-default">
-                <Globe size={12} className="text-brand-gold animate-spin-slow" />
-                <span className="text-brand-gold font-black text-[9px] uppercase tracking-[0.25em]">Global Control Hub</span>
-             </div>
-             <div className="flex items-center gap-2 px-4 py-1.5 bg-emerald-50 rounded-full border border-emerald-100">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-emerald-600 font-black text-[9px] uppercase tracking-widest">Engine Live</span>
-             </div>
-          </div>
-          <h1 className="text-6xl font-black tracking-tighter text-slate-900 uppercase leading-none">
-            Infrastructure <span className="text-brand-gold">Dashboard</span>
+      {/* Welcome Section */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pt-4">
+        <div>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-2">
+            Welcome back, <span className="text-[#FF5F38]">{user?.displayName?.split(' ')[0] || 'Admin'}</span> 👋
           </h1>
-          <p className="text-slate-400 font-bold text-xs uppercase tracking-[0.3em] leading-none opacity-60">Real-time Node Performance & Metrics</p>
+          <p className="text-slate-400 font-bold text-sm tracking-tight">Monitor your WhatsApp infrastructure and communication flow.</p>
         </div>
         <div className="flex items-center gap-4">
-           <div className="hidden lg:flex items-center gap-3 px-6 py-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
-              <div className="text-right">
-                 <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Network Latency</p>
-                 <p className="text-sm font-black text-slate-900 tracking-tighter">14ms <span className="text-emerald-500">OPTIMAL</span></p>
+           <div className="flex -space-x-3">
+              {[1,2,3,4].map(i => (
+                <div key={i} className="w-10 h-10 rounded-full border-4 border-white bg-slate-200 overflow-hidden shadow-sm">
+                   <img src={`https://i.pravatar.cc/100?u=${i}`} alt="User" />
+                </div>
+              ))}
+              <div className="w-10 h-10 rounded-full border-4 border-white bg-orange-50 flex items-center justify-center text-[10px] font-black text-[#FF5F38] shadow-sm">
+                 198+
               </div>
-              <Activity className="text-brand-gold" size={24} />
            </div>
-           <ExportButton data={[totalStats]} filename="global_infrastructure_report" />
+           <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Online Now</span>
         </div>
       </div>
 
-      {/* Main Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
-          title="Consolidated Traffic" 
+          title="Total Students" 
           value={d.inbound + d.outbound} 
-          icon={MessageSquare}
-          description="Total packet exchange"
+          icon={Users}
+          description="Consolidated traffic"
           trend="up"
         />
         <StatCard 
-          title="Inbound Flow" 
+          title="Active Tutors" 
           value={d.inbound} 
-          icon={Users}
-          description="Total received signals"
+          icon={MessageSquare}
+          description="Inbound signals"
         />
         <StatCard 
-          title="Outbound Pipeline" 
+          title="Courses Sent" 
           value={d.outbound} 
           icon={Send}
-          description="Signals transmitted"
+          description="Outbound signals"
         />
         <StatCard 
-          title="Infrastructure Health" 
-          value={d.failed} 
-          icon={AlertTriangle}
-          description="Packet loss detection"
+          title="System Health" 
+          value="99.9" 
+          icon={Zap}
+          description="Infrastructure status"
         />
       </div>
 
-      {/* Analytics Matrix */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-10">
+      {/* Analytics Layout */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
         
-        {/* Primary Viewport */}
-        <div className="xl:col-span-8 space-y-10">
-          <div className="relative group">
-             <div className="absolute -inset-1 bg-gradient-to-r from-brand-gold/10 to-transparent blur-2xl opacity-0 group-hover:opacity-100 transition-all duration-1000" />
+        {/* Main Chart Area */}
+        <div className="xl:col-span-8 space-y-8">
+          <div className="premium-card p-8 bg-white border-none shadow-[0_8px_40px_rgba(0,0,0,0.02)]">
+             <div className="flex items-center justify-between mb-8">
+                <div>
+                   <h3 className="text-xl font-black text-slate-900 tracking-tight">Average Sales</h3>
+                   <p className="text-xs font-bold text-slate-400">Total revenue generated per node</p>
+                </div>
+                <select className="bg-slate-50 border-none rounded-xl px-4 py-2 text-xs font-bold text-slate-600 focus:ring-2 ring-orange-100 outline-none">
+                   <option>Overall</option>
+                   <option>Weekly</option>
+                   <option>Monthly</option>
+                </select>
+             </div>
              <ActivityChart ownerId={user?.uid} />
           </div>
           
-          <div className="space-y-6">
-            <div className="flex items-center justify-between px-2">
-               <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-3">
-                  <Clock size={20} className="text-brand-gold" /> Activity Archive
-               </h3>
-               <button className="text-[10px] font-black text-slate-400 hover:text-slate-900 uppercase tracking-widest transition-all">View Extended Logs</button>
-            </div>
-            <RecentMessages ownerId={user?.uid} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+             <div className="premium-card p-6 bg-white border-none shadow-[0_8px_40px_rgba(0,0,0,0.02)]">
+                <div className="flex items-center justify-between mb-6">
+                   <h3 className="text-lg font-black text-slate-900 tracking-tight">Today's Transactions</h3>
+                   <button className="text-[10px] font-black text-[#FF5F38] uppercase tracking-widest hover:underline">View All</button>
+                </div>
+                <RecentMessages ownerId={user?.uid} limit={3} />
+             </div>
+             <div className="premium-card p-6 bg-white border-none shadow-[0_8px_40px_rgba(0,0,0,0.02)]">
+                <div className="flex items-center justify-between mb-6">
+                   <h3 className="text-lg font-black text-slate-900 tracking-tight">Top Performing Node</h3>
+                   <MoreHorizontal size={20} className="text-slate-300" />
+                </div>
+                <div className="space-y-4">
+                   {[
+                     { name: 'Joshua Ashiru', points: '9.6/10', color: 'bg-yellow-400' },
+                     { name: 'Adeola Ayo', points: '9.1/10', color: 'bg-slate-400' },
+                     { name: 'Olawuyi Tobi', points: '8.5/10', color: 'bg-orange-400' }
+                   ].map((item, idx) => (
+                     <div key={idx} className="flex items-center gap-4 p-3 hover:bg-slate-50 rounded-2xl transition-colors cursor-pointer group">
+                        <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-xs", item.color)}>
+                           {item.name.charAt(0)}
+                        </div>
+                        <div className="flex-1">
+                           <p className="text-sm font-black text-slate-900 leading-none mb-1 group-hover:text-[#FF5F38] transition-colors">{item.name}</p>
+                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.points} Points</p>
+                        </div>
+                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-orange-100 group-hover:text-[#FF5F38] transition-all">
+                           <ArrowUpRight size={14} />
+                        </div>
+                     </div>
+                   ))}
+                </div>
+             </div>
           </div>
         </div>
         
-        {/* Secondary Viewport */}
-        <div className="xl:col-span-4 space-y-10">
-          
-          {/* Real-time Traffic */}
-          <div className="p-10 bg-white border border-slate-100 rounded-[3rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.05)] relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-8">
-               <div className="flex items-center gap-2 px-3 py-1 bg-brand-gold/10 rounded-full border border-brand-gold/10">
-                  <div className="w-1 h-1 rounded-full bg-brand-gold animate-ping" />
-                  <span className="text-[8px] font-black text-brand-gold uppercase tracking-[0.2em]">Live Stream</span>
-               </div>
-            </div>
-            <h3 className="text-sm font-black text-slate-900 mb-8 uppercase tracking-[0.25em]">Network Flow Monitor</h3>
-            <MessageFlow ownerId={user?.uid} />
-          </div>
-
-          {/* Aggregate Intelligence */}
-          <div className="p-10 bg-slate-900 text-white rounded-[3rem] shadow-2xl relative overflow-hidden group min-h-[400px] flex flex-col justify-between">
-            <div className="absolute -right-20 -top-20 w-64 h-64 bg-brand-gold/20 rounded-full blur-[100px] group-hover:scale-150 transition-all duration-1000" />
-            <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-blue-500/10 rounded-full blur-[100px] group-hover:scale-150 transition-all duration-1000 delay-300" />
-            
-            <div className="relative z-10">
-              <div className="flex items-center gap-4 mb-10">
-                 <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center text-brand-gold shadow-2xl">
-                    <BarChart3 size={28} />
-                 </div>
-                 <div>
-                    <h3 className="text-sm font-black text-white uppercase tracking-[0.3em]">System Aggregate</h3>
-                    <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest mt-1 italic">Consolidated Node Metrics</p>
+        {/* Sidebar Widgets Area */}
+        <div className="xl:col-span-4 space-y-8">
+           {/* Calendar Widget Mockup */}
+           <div className="premium-card p-8 bg-white border-none shadow-[0_8px_40px_rgba(0,0,0,0.02)]">
+              <div className="flex items-center justify-between mb-8">
+                 <h3 className="text-lg font-black text-slate-900 tracking-tight">My Progress</h3>
+                 <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1.5 rounded-lg">
+                    FEB 2023 <ChevronDown size={12} />
                  </div>
               </div>
-
-              <div className="space-y-8">
-                <div className="group/item">
-                  <div className="flex justify-between items-center mb-3">
-                    <span className="text-white/40 font-black uppercase tracking-[0.2em] text-[9px] group-hover/item:text-brand-gold transition-colors">Cumulative Inbound</span>
-                    <div className="flex items-center gap-2">
-                       <ArrowUpRight size={14} className="text-emerald-500" />
-                       <span className="text-brand-gold font-black font-mono text-2xl tracking-tighter">{totalStats.totalInbound.toLocaleString()}</span>
-                    </div>
-                  </div>
-                  <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
-                     <div className="h-full bg-emerald-500 w-[78%] group-hover/item:w-[85%] transition-all duration-1000" />
-                  </div>
-                </div>
-
-                <div className="group/item">
-                  <div className="flex justify-between items-center mb-3">
-                    <span className="text-white/40 font-black uppercase tracking-[0.2em] text-[9px] group-hover/item:text-brand-gold transition-colors">Cumulative Outbound</span>
-                    <div className="flex items-center gap-2">
-                       <ArrowUpRight size={14} className="text-blue-500" />
-                       <span className="text-brand-gold font-black font-mono text-2xl tracking-tighter">{totalStats.totalOutbound.toLocaleString()}</span>
-                    </div>
-                  </div>
-                  <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
-                     <div className="h-full bg-blue-500 w-[64%] group-hover/item:w-[72%] transition-all duration-1000" />
-                  </div>
-                </div>
+              <div className="grid grid-cols-7 gap-2 text-center mb-4">
+                 {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map(d => (
+                   <span key={d} className="text-[10px] font-black text-slate-300 uppercase">{d}</span>
+                 ))}
               </div>
-            </div>
+              <div className="grid grid-cols-7 gap-2 text-center">
+                 {Array.from({length: 31}).map((_, i) => (
+                   <div key={i} className={cn(
+                     "h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold transition-all cursor-pointer",
+                     i + 1 === 10 ? "bg-blue-500 text-white shadow-lg shadow-blue-200" :
+                     i + 1 === 13 ? "bg-[#FF5F38] text-white shadow-lg shadow-orange-200" :
+                     i + 1 === 18 ? "bg-emerald-500 text-white shadow-lg shadow-emerald-200" :
+                     "text-slate-600 hover:bg-slate-50"
+                   )}>
+                      {i + 1}
+                   </div>
+                 ))}
+              </div>
+           </div>
 
-            <div className="relative z-10 pt-10 border-t border-white/5">
-               <div className="flex justify-between items-end">
-                  <div>
-                    <p className="text-[8px] font-black text-white/30 uppercase tracking-[0.3em] mb-2">Cluster Efficiency</p>
-                    <p className="text-4xl font-black text-white tracking-tighter">99.9<span className="text-brand-gold text-lg">%</span></p>
-                  </div>
-                  <div className="bg-brand-gold text-slate-900 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-brand-gold/20">
-                     OPTIMIZED
-                  </div>
-               </div>
-            </div>
-          </div>
-
+           {/* Upcoming Activities Widget */}
+           <div className="space-y-6">
+              <div className="flex items-center justify-between px-2">
+                 <h3 className="text-lg font-black text-slate-900 tracking-tight">Upcoming Activities</h3>
+                 <button className="text-[10px] font-black text-[#FF5F38] uppercase tracking-widest hover:underline">See All</button>
+              </div>
+              <div className="space-y-4">
+                 {[
+                   { title: 'Islamic Studies Tutorial', time: '8th - 10th Mar 2023', color: 'bg-blue-500' },
+                   { title: 'Social Insurance Test', time: '13th Mar 2023', color: 'bg-rose-500' }
+                 ].map((act, idx) => (
+                   <div key={idx} className="premium-card p-5 flex items-center gap-5 group cursor-pointer hover:-translate-y-1 transition-all">
+                      <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg", act.color)}>
+                         <Calendar size={20} />
+                      </div>
+                      <div className="flex-1">
+                         <h4 className="text-sm font-black text-slate-900 leading-tight mb-1 group-hover:text-[#FF5F38] transition-colors">{act.title}</h4>
+                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{act.time}</p>
+                      </div>
+                      <ChevronRight size={16} className="text-slate-200 group-hover:text-[#FF5F38] transition-colors" />
+                   </div>
+                 ))}
+              </div>
+           </div>
         </div>
       </div>
     </div>
   );
 }
+
+

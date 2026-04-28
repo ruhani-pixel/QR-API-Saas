@@ -226,8 +226,8 @@ export class Whatsapp {
                   this.sessions.delete(sessionId);
                 }
 
-                this.callback.get(CALLBACK_KEY.ON_DISCONNECTED)?.(sessionId);
-                options.onDisconnected?.();
+                this.callback.get(CALLBACK_KEY.ON_DISCONNECTED)?.(sessionId, code);
+                options.onDisconnected?.(code);
               }
             }
             if (connection == "open") {

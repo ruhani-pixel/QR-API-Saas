@@ -66,7 +66,7 @@ export interface StartSessionParams {
   onQRUpdated?: (qr: string) => void;
   onConnected?: () => void;
   onConnecting?: () => void;
-  onDisconnected?: () => void;
+  onDisconnected?: (reason?: number) => void;
 
   // message events
   onMessageReceived?: (message: MessageReceived) => void;
@@ -86,7 +86,7 @@ export interface StartSessionWithPairingCodeParams {
   onQRUpdated?: (qr: string) => void;
   onConnected?: () => void;
   onConnecting?: () => void;
-  onDisconnected?: () => void;
+  onDisconnected?: (reason?: number) => void;
   onPairingCode?: (code: string) => void;
 
   // message events
