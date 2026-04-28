@@ -24,15 +24,7 @@ export function Header({ isCollapsed, setIsCollapsed }: HeaderProps) {
   return (
     <header className="h-14 border-b border-slate-200 bg-white/80 backdrop-blur-md flex items-center justify-between px-6 z-40 sticky top-0 transition-all duration-500">
       <div className="flex items-center gap-6 flex-1">
-        {/* Sidebar Toggle for Header (Visible when sidebar is collapsed or on mobile) */}
-        {setIsCollapsed && (
-          <button 
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-2 -ml-2 text-slate-400 hover:text-slate-900 transition-colors"
-          >
-            {isCollapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
-          </button>
-        )}
+
 
         {/* Hub Branding */}
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest bg-slate-100 border border-slate-200/50">

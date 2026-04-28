@@ -260,7 +260,10 @@ export default function InboxPage() {
                     )}>
                       {chat.pushName?.charAt(0)}
                     </div>
-                    <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 border-4 border-white rounded-full" />
+                    <div className={cn(
+                      "absolute -bottom-1 -right-1 w-5 h-5 border-4 border-white rounded-full",
+                      presences[chat.remoteJid]?.lastKnownPresence === 'available' ? "bg-emerald-500" : "bg-slate-300"
+                    )} />
                   </div>
                   <div className="flex-1 text-left">
                     <div className="flex justify-between items-center mb-1">
@@ -272,7 +275,9 @@ export default function InboxPage() {
                       </span>
                     </div>
                     <p className={cn("text-[11px] font-medium line-clamp-1", selectedChat?.id === chat.id ? "text-slate-400" : "text-slate-500")}>
-                      {chat.lastMessage}
+                      {presences[chat.remoteJid]?.lastKnownPresence === 'composing' ? (
+                        <span className="text-brand-gold font-black animate-pulse">Typing...</span>
+                      ) : chat.lastMessage}
                     </p>
                   </div>
                 </button>
