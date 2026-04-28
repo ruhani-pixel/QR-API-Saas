@@ -2,15 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { 
-  Search, Send, Paperclip, MoreVertical, 
-  Smartphone, User, Check, CheckCheck,
-  MessageSquare, Plus, Phone, Video, 
-  ChevronLeft, Filter, Zap, Smile, Mic,
-  MoreHorizontal, Users, Star, MessageSquarePlus,
-  ChevronDown, LayoutGrid, Image as ImageIcon, FileText, X,
-  FileIcon, Download, Loader2
+  Search, Send, MoreVertical, Smartphone, Check, CheckCheck, 
+  Users, MessageSquarePlus, ChevronDown, Image as ImageIcon, 
+  FileText, X, Download, Loader2, Camera, UserCircle2, 
+  ShieldCheck, Music, Play, Mic, Plus, Smile, Trash2,
+  ChevronLeft, Video
 } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
 import { io } from 'socket.io-client';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -19,84 +16,67 @@ import EmojiPicker from 'emoji-picker-react';
 const socket = io('http://localhost:3001');
 const API_URL = 'http://localhost:3001';
 
+// PREMIUM COLOR TOKENS
+const THEME = {
+  primary: '#008069',
+  bg: '#F0F2F5',
+  border: '#D1D7DB',
+  text: '#111B21',
+  textSecondary: '#667781',
+  bubbleOut: '#D9FDD3',
+  bubbleIn: '#FFFFFF'
+};
+
 export default function InboxPage() {
-  const { user } = useAuth();
   const [devices, setDevices] = useState([]);
   const [selectedSessionId, setSelectedSessionId] = useState(null);
   const [chats, setChats] = useState([]);
+  const [filteredChats, setFilteredChats] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [presences, setPresences] = useState({});
-  const messagesEndRef = useRef(null);
-  const fileInputRef = useRef(null);
+  const [profilePics, setProfilePics] = useState({});
   
-  const [isDeviceMenuOpen, setIsDeviceMenuOpen] = useState(false);
   const [isEmojiOpen, setIsEmojiOpen] = useState(false);
   const [isMediaMenuOpen, setIsMediaMenuOpen] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
   const [isSendingMedia, setIsSendingMedia] = useState(false);
-  const [profilePics, setProfilePics] = useState({});
+
+  const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const recordingIntervalRef = useRef(null);
 
   useEffect(() => {
-    const fetchDevices = async () => {
-      try {
-        const res = await fetch(`${API_URL}/api/sessions`);
-        const data = await res.json();
-        setDevices(data);
-        if (data.length > 0 && !selectedSessionId) {
-          const firstOnline = data.find(d => d.status === 'online');
-          setSelectedSessionId(firstOnline?.sessionId || data[0].sessionId);
-        }
-      } catch (e) {}
-    };
-    fetchDevices();
+    fetch(`${API_URL}/api/sessions`).then(r => r.json()).then(data => {
+      setDevices(data);
+      if (data.length > 0) setSelectedSessionId(data[0].sessionId);
+    });
   }, []);
 
   useEffect(() => {
     if (!selectedSessionId) return;
     fetchChats();
-
-    socket.on('presence-update', (data) => {
-      if (data.sessionId === selectedSessionId) {
-        setPresences(prev => ({ ...prev, [data.remoteJid]: data.presence }));
-      }
-    });
-
-    socket.on('message:incoming', (data) => {
-       if (data.sessionId === selectedSessionId) {
-         if (selectedChat?.id === data.key.remoteJid) fetchChatHistory(selectedChat.id);
-         fetchChats();
-       }
-    });
-
-    socket.on('message:status', (data) => {
-       setMessages(prev => prev.map(m => m.whatsappId === data.whatsappId ? { ...m, status: data.status } : m));
-    });
-
-    return () => {
-      socket.off('presence-update');
-      socket.off('message:incoming');
-      socket.off('message:status');
-    };
+    socket.on('message:incoming', (data) => { if (data.sessionId === selectedSessionId) { if (selectedChat?.id === data.key.remoteJid) fetchChatHistory(selectedChat.id); fetchChats(); } });
+    socket.on('history:synced', (data) => { if (data.sessionId === selectedSessionId) fetchChats(); });
+    return () => { socket.off('message:incoming'); socket.off('history:synced'); };
   }, [selectedSessionId, selectedChat]);
 
-  useEffect(() => { scrollToBottom(); }, [messages]);
+  useEffect(() => {
+    const q = searchQuery.toLowerCase();
+    setFilteredChats(chats.filter(c => c.name.toLowerCase().includes(q)));
+  }, [searchQuery, chats]);
+
+  useEffect(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), [messages]);
 
   const fetchChats = async () => {
-    if (!selectedSessionId) return;
     const res = await fetch(`${API_URL}/api/whatsapp/chats?sessionId=${selectedSessionId}`);
     const data = await res.json();
     setChats(data);
-    // Fetch profile pics for visible chats
-    data.forEach(chat => { if (!profilePics[chat.id]) fetchProfilePic(chat.id); });
-  };
-
-  const fetchProfilePic = async (remoteJid) => {
-    try {
-      const res = await fetch(`${API_URL}/api/whatsapp/profile-pic?sessionId=${selectedSessionId}&remoteJid=${remoteJid}`);
-      const data = await res.json();
-      if (data.url) setProfilePics(prev => ({ ...prev, [remoteJid]: data.url }));
-    } catch (e) {}
+    setFilteredChats(data);
   };
 
   const fetchChatHistory = async (remoteJid) => {
@@ -105,168 +85,199 @@ export default function InboxPage() {
     setMessages(data);
   };
 
-  const loadChatHistory = async (chat) => {
-    setSelectedChat(chat);
-    fetchChatHistory(chat.id);
-  };
-
   const handleSendMessage = async () => {
-    if (!inputText.trim() || !selectedChat || !selectedSessionId) return;
-    const textToSend = inputText;
-    setInputText('');
-    setIsEmojiOpen(false);
-    try {
-      const res = await fetch(`${API_URL}/api/message/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: selectedSessionId, to: selectedChat.id, text: textToSend })
-      });
-      if (res.ok) fetchChatHistory(selectedChat.id);
-    } catch (e) {}
+    if (!inputText.trim() || !selectedChat) return;
+    const text = inputText; setInputText(''); setIsEmojiOpen(false);
+    await fetch(`${API_URL}/api/message/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: selectedSessionId, to: selectedChat.id, text })
+    });
+    fetchChatHistory(selectedChat.id);
   };
 
-  const handleFileUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file || !selectedChat || !selectedSessionId) return;
+  const handleMediaUpload = async (file) => {
+    if (!file || !selectedChat) return;
     setIsSendingMedia(true);
-    setIsMediaMenuOpen(false);
     const formData = new FormData();
     formData.append('media', file);
     formData.append('sessionId', selectedSessionId);
     formData.append('to', selectedChat.id);
-    formData.append('caption', '');
-    let type = 'document';
-    if (file.type.startsWith('image/')) type = 'image';
-    else if (file.type.startsWith('video/')) type = 'video';
+    let type = file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'document';
     formData.append('type', type);
-    try {
-      const res = await fetch(`${API_URL}/api/message/send-media`, { method: 'POST', body: formData });
-      if (res.ok) fetchChatHistory(selectedChat.id);
-    } catch (e) {} finally {
-      setIsSendingMedia(false);
-      e.target.value = '';
-    }
+    await fetch(`${API_URL}/api/message/send-media`, { method: 'POST', body: formData });
+    setIsSendingMedia(false);
+    fetchChatHistory(selectedChat.id);
   };
 
-  const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
-  const onEmojiClick = (emojiData) => { setInputText(prev => prev + emojiData.emoji); };
-  const currentDevice = devices.find(d => d.sessionId === selectedSessionId);
+  const startRecording = async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const recorder = new MediaRecorder(stream);
+    const chunks = [];
+    recorder.ondataavailable = e => chunks.push(e.data);
+    recorder.onstop = () => handleMediaUpload(new File([new Blob(chunks)], "voice.ogg", { type: 'audio/ogg' }));
+    recorder.start();
+    mediaRecorderRef.current = recorder;
+    setIsRecording(true);
+    setRecordingTime(0);
+    recordingIntervalRef.current = setInterval(() => setRecordingTime(p => p + 1), 1000);
+  };
+
+  const stopRecording = (send = true) => {
+    clearInterval(recordingIntervalRef.current);
+    if (!send) mediaRecorderRef.current.onstop = null;
+    mediaRecorderRef.current.stop();
+    mediaRecorderRef.current.stream.getTracks().forEach(t => t.stop());
+    setIsRecording(false);
+  };
+
+  const Ticks = ({ status }) => (
+    <div className="flex">
+      {status === 'read' ? <CheckCheck size={15} className="text-[#53BDEB]" /> : 
+       status === 'delivered' ? <CheckCheck size={15} className="text-[#667781]" /> : 
+       <Check size={15} className="text-[#667781]" />}
+    </div>
+  );
 
   return (
-    <div className="flex h-full bg-[#F0F2F5] overflow-hidden font-sans">
-        <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
+    <div className="flex h-screen bg-[#F0F2F5] text-[#111B21] overflow-hidden font-sans antialiased">
+        <input type="file" ref={fileInputRef} className="hidden" onChange={e => handleMediaUpload(e.target.files[0])} />
 
-        <div className={cn("w-full md:w-[400px] lg:w-[450px] flex flex-col border-r border-[#D1D7DB] bg-white transition-all duration-500", selectedChat && "hidden md:flex")}>
-          <div className="bg-[#F0F2F5] px-4 py-3 flex items-center justify-between border-b border-[#E9EDEF] relative">
-             <div className="relative">
-                <button onClick={() => setIsDeviceMenuOpen(!isDeviceMenuOpen)} className="flex items-center gap-3 bg-white px-4 py-2 rounded-2xl shadow-sm border border-slate-200 hover:border-[#FF5F38] transition-all group">
-                   <div className={cn("w-2 h-2 rounded-full", currentDevice?.status === 'online' ? "bg-emerald-500 animate-pulse" : "bg-slate-300")} />
-                   <span className="text-[13px] font-black text-slate-900 tracking-tight">{currentDevice?.name || 'Select Device'}</span>
-                   <ChevronDown size={16} className={cn("text-slate-400 group-hover:text-[#FF5F38] transition-all", isDeviceMenuOpen && "rotate-180")} />
-                </button>
-                <AnimatePresence>
-                  {isDeviceMenuOpen && (
-                    <>
-                      <div className="fixed inset-0 z-[60]" onClick={() => setIsDeviceMenuOpen(false)} />
-                      <motion.div initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: 0.95 }} className="absolute top-full left-0 mt-2 w-64 bg-white rounded-3xl shadow-2xl border border-slate-100 p-2 z-[70] overflow-hidden">
-                         {devices.map(device => (
-                           <button key={device.sessionId} onClick={() => { setSelectedSessionId(device.sessionId); setSelectedChat(null); setIsDeviceMenuOpen(false); }} className={cn("w-full flex items-center justify-between p-3 rounded-2xl transition-all", selectedSessionId === device.sessionId ? "bg-orange-50 text-[#FF5F38]" : "hover:bg-slate-50 text-slate-600")}>
-                             <div className="flex items-center gap-3">
-                                <Smartphone size={18} className={selectedSessionId === device.sessionId ? "text-[#FF5F38]" : "text-slate-400"} />
-                                <div className="text-left"><p className="text-sm font-bold mb-1">{device.name}</p><p className="text-[10px] opacity-60">{device.status === 'online' ? 'Connected' : 'Offline'}</p></div>
-                             </div>
-                             {selectedSessionId === device.sessionId && <Check size={16} />}
-                           </button>
-                         ))}
-                      </motion.div>
-                    </>
-                  )}
-                </AnimatePresence>
-             </div>
-          </div>
-
-          <div className="px-3 py-1.5 bg-white">
-            <div className="relative group flex items-center bg-[#F0F2F5] rounded-xl px-3 mt-1">
-              <Search size={16} className="text-[#54656F]" />
-              <input type="text" placeholder="Search chats" className="w-full bg-transparent border-none py-2.5 pl-3 pr-2 text-sm text-[#3B4A54] focus:outline-none" />
+        {/* CHAT LIST */}
+        <div className={cn("w-full md:w-[420px] flex flex-col bg-white border-r border-[#D1D7DB] z-20", selectedChat && "hidden md:flex")}>
+          <div className="bg-[#F0F2F5] h-[59px] px-4 flex items-center justify-between">
+            <div className="w-10 h-10 rounded-full bg-[#DFE5E7] flex items-center justify-center overflow-hidden border border-white cursor-pointer"><UserCircle2 size={42} className="text-[#AEBAC1]" /></div>
+            <div className="flex items-center gap-6 text-[#54656F]">
+               <button className="hover:bg-[#D9DBDF] p-2 rounded-full transition-colors"><Users size={22} /></button>
+               <button className="hover:bg-[#D9DBDF] p-2 rounded-full transition-colors"><MessageSquarePlus size={22} /></button>
+               <button className="hover:bg-[#D9DBDF] p-2 rounded-full transition-colors"><MoreVertical size={22} /></button>
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto no-scrollbar bg-white">
-            {chats.map((chat) => (
-              <button key={chat.id} onClick={() => loadChatHistory(chat)} className={cn("w-full h-[72px] px-3 flex items-center gap-3 transition-colors relative group", selectedChat?.id === chat.id ? "bg-[#F0F2F5]" : "hover:bg-[#F5F6F6] bg-white")}>
-                <div className="w-12 h-12 rounded-full bg-[#DFE5E7] flex items-center justify-center text-white overflow-hidden shrink-0">
-                  {profilePics[chat.id] ? <img src={profilePics[chat.id]} className="w-full h-full object-cover" /> : <User size={32} />}
+          <div className="p-3">
+             <div className="flex items-center bg-[#F0F2F5] rounded-lg px-4 focus-within:bg-white focus-within:shadow-sm border border-transparent focus-within:border-[#008069] transition-all">
+                <Search size={18} className="text-[#54656F]" />
+                <input type="text" placeholder="Search or start a new chat" className="w-full bg-transparent border-none py-2 pl-4 text-[15px] focus:outline-none" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+             </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            {filteredChats.map(chat => (
+              <button key={chat.id} onClick={() => { setSelectedChat(chat); fetchChatHistory(chat.id); }} className={cn("w-full h-18 px-3 flex items-center gap-3 hover:bg-[#F5F6F6] transition-colors border-b border-[#F0F2F5]", selectedChat?.id === chat.id && "bg-[#F0F2F5]")}>
+                <div className="w-12 h-12 rounded-full bg-[#DFE5E7] flex items-center justify-center overflow-hidden shrink-0">
+                  {chat.profilePic ? <img src={chat.profilePic} className="w-full h-full object-cover" /> : <UserCircle2 size={48} className="text-[#AEBAC1]" />}
                 </div>
-                <div className="flex-1 text-left min-w-0 border-b border-[#F0F2F5] h-full flex flex-col justify-center pr-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[17px] text-[#111B21] truncate font-medium">{chat.name}</span>
-                    <span className="text-[11px] font-medium text-[#667781]">{new Date(chat.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                  </div>
-                  <p className="text-[14px] text-[#667781] truncate font-normal">{chat.lastMessage}</p>
+                <div className="flex-1 text-left min-w-0">
+                   <div className="flex justify-between items-center"><span className="text-[17px] font-medium truncate">{chat.name}</span><span className="text-[12px] text-[#667781]">{new Date(chat.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
+                   <div className="flex items-center gap-1"><p className="text-[14px] text-[#667781] truncate">{chat.lastMessage}</p></div>
                 </div>
               </button>
             ))}
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col relative overflow-hidden bg-[#EFEAE2]">
-          <div className="absolute inset-0 opacity-[0.06] pointer-events-none" style={{ backgroundImage: 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")' }} />
-
-          {!selectedChat ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center relative z-10">
-              <div className="w-64 h-64 opacity-20 mb-8"><img src="https://static.whatsapp.net/rsrc.php/v3/y6/r/wa669ae5yIx.png" alt="WA" className="w-full h-full object-contain" /></div>
-              <h2 className="text-[32px] font-light text-[#41525D] mb-4">WhatsApp Business</h2>
-              <p className="text-[14px] text-[#667781] max-w-sm font-normal">Select a device to sync and manage messages instantly.</p>
-            </div>
-          ) : (
-            <div className="flex-1 flex flex-col h-full relative z-10">
-              <div className="bg-[#F0F2F5] px-4 py-2.5 flex items-center justify-between border-l border-[#D1D7DB]">
-                <div className="flex items-center gap-3">
-                  <button onClick={() => setSelectedChat(null)} className="md:hidden p-2 text-[#54656F]"><ChevronLeft size={24} /></button>
-                  <div className="w-10 h-10 rounded-full bg-[#DFE5E7] flex items-center justify-center text-white overflow-hidden shrink-0">
-                    {profilePics[selectedChat.id] ? <img src={profilePics[selectedChat.id]} className="w-full h-full object-cover" /> : <User size={28} />}
-                  </div>
-                  <div>
-                    <h2 className="text-[16px] font-medium text-[#111B21] leading-tight">{selectedChat.name}</h2>
-                    <span className="text-[13px] text-[#667781]">{presences[selectedChat.id]?.lastKnownPresence === 'available' ? 'online' : ''}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 text-[#54656F]">
-                  <button className="p-2 hover:bg-[#D9DBDF] rounded-full transition-colors"><Video size={20} /></button>
-                  <button className="p-2 hover:bg-[#D9DBDF] rounded-full transition-colors"><Search size={20} /></button>
-                  <button className="p-2 hover:bg-[#D9DBDF] rounded-full transition-colors"><MoreVertical size={20} /></button>
-                </div>
-              </div>
-
-              <div className="flex-1 overflow-y-auto no-scrollbar p-6 space-y-1.5">
-                {messages.map((msg, i) => {
-                  const isOutbound = msg.direction === 'outbound';
-                  return (
-                    <div key={msg.whatsappId || i} className={cn("flex w-full", isOutbound ? "justify-end" : "justify-start")}>
-                      <div className={cn("relative px-2.5 py-1.5 max-w-[65%] shadow-[0_1px_0.5px_rgba(0,0,0,0.13)] min-w-[80px]", isOutbound ? "bg-[#D9FDD3] rounded-l-lg rounded-br-lg" : "bg-white rounded-r-lg rounded-bl-lg")}>
-                        {msg.type === 'image' && <div className="mb-1.5 rounded-lg overflow-hidden border border-black/5 bg-slate-50 min-w-[200px]"><img src={`${API_URL}${msg.mediaPath}`} className="w-full h-auto max-h-[300px] object-cover" /></div>}
-                        {msg.type === 'video' && <div className="mb-1.5 rounded-lg overflow-hidden border border-black/5 bg-black min-w-[200px]"><video src={`${API_URL}${msg.mediaPath}`} controls className="w-full h-auto max-h-[300px]" /></div>}
-                        {msg.type === 'document' && <div className="mb-1.5 p-3 rounded-lg bg-slate-50 flex items-center gap-3 border border-slate-100 min-w-[200px]"><div className="w-10 h-10 bg-[#FF5F38] text-white rounded-lg flex items-center justify-center shrink-0"><FileText size={24} /></div><div className="flex-1 min-w-0"><p className="text-xs font-bold text-slate-700 truncate">{msg.fileName || 'File'}</p><p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Document</p></div><a href={`${API_URL}${msg.mediaPath}`} download className="p-2 text-slate-400 hover:text-slate-900"><Download size={18} /></a></div>}
-                        <p className="text-[14.2px] text-[#111B21] font-normal leading-relaxed break-words whitespace-pre-wrap">{msg.content}</p>
-                        <div className="flex items-center justify-end gap-1 -mt-1 ml-4"><span className="text-[11px] text-[#667781] uppercase">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}</span>{isOutbound && <div className="flex items-center">{msg.status === 'read' ? <CheckCheck size={16} className="text-[#53BDEB]" /> : msg.status === 'delivered' ? <CheckCheck size={16} className="text-[#667781]" /> : <Check size={16} className="text-[#667781]" />}</div>}</div>
+        {/* CONVERSATION AREA */}
+        <div className="flex-1 flex flex-col relative bg-[#EFEAE2] z-10 shadow-xl">
+           <div className="absolute inset-0 opacity-[0.06] pointer-events-none" style={{ backgroundImage: 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")' }} />
+           
+           {!selectedChat ? (
+             <div className="flex-1 flex flex-col items-center justify-center bg-[#F0F2F5] p-10 text-center relative z-10">
+                <img src="https://static.whatsapp.net/rsrc.php/v3/y6/r/wa669ae5yIx.png" className="w-64 h-64 mb-10 opacity-60 grayscale" />
+                <h2 className="text-[32px] font-light text-[#41525D] mb-4">WhatsApp Web</h2>
+                <p className="text-[14px] text-[#667781] max-w-sm">Send and receive messages without keeping your phone online. Use WhatsApp on up to 4 linked devices at the same time.</p>
+                <div className="mt-20 flex items-center gap-2 text-[#8696a0] text-[12px] uppercase tracking-widest"><ShieldCheck size={16} /><span>End-to-end encrypted</span></div>
+             </div>
+           ) : (
+             <div className="flex-1 flex flex-col h-full relative z-10">
+                <div className="bg-[#F0F2F5] h-[59px] px-4 flex items-center justify-between border-l border-[#D1D7DB] z-30">
+                   <div className="flex items-center gap-3">
+                      <button onClick={() => setSelectedChat(null)} className="md:hidden p-2"><ChevronLeft size={24} /></button>
+                      <div className="w-10 h-10 rounded-full overflow-hidden border border-white shrink-0">
+                         {selectedChat?.profilePic ? <img src={selectedChat.profilePic} /> : <UserCircle2 size={40} className="text-[#AEBAC1]" />}
                       </div>
-                    </div>
-                  );
-                })}
-                {isSendingMedia && <div className="flex justify-end w-full"><div className="bg-[#D9FDD3] px-4 py-3 rounded-2xl flex items-center gap-3 shadow-sm border border-black/5"><Loader2 className="w-4 h-4 text-[#008069] animate-spin" /><span className="text-xs font-bold text-[#008069]">Sending Media...</span></div></div>}
-                <div ref={messagesEndRef} />
-              </div>
+                      <div className="flex flex-col">
+                         <h2 className="text-[16px] font-medium leading-tight">{selectedChat.name}</h2>
+                         <span className="text-[12px] text-[#667781]">{selectedChat.isGroup ? 'Group' : 'online'}</span>
+                      </div>
+                   </div>
+                   <div className="flex items-center gap-6 text-[#54656F]">
+                      <button><Video size={22} /></button><button><Search size={22} /></button><button><MoreVertical size={22} /></button>
+                   </div>
+                </div>
 
-              <div className="bg-[#F0F2F5] px-4 py-2.5 flex items-center gap-3 relative">
-                <AnimatePresence>{isEmojiOpen && <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="absolute bottom-full left-4 mb-4 z-[100]"><EmojiPicker onEmojiClick={onEmojiClick} /></motion.div>}</AnimatePresence>
-                <AnimatePresence>{isMediaMenuOpen && <><div className="fixed inset-0" onClick={() => setIsMediaMenuOpen(false)} /><motion.div initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: 0.95 }} className="absolute bottom-full left-12 mb-4 bg-white rounded-3xl shadow-2xl p-2 z-[100] border border-slate-100 min-w-[200px]"><button onClick={() => fileInputRef.current.click()} className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 rounded-2xl transition-all"><div className="w-10 h-10 bg-indigo-50 text-indigo-500 rounded-xl flex items-center justify-center"><ImageIcon size={20} /></div><span className="text-xs font-bold text-slate-700">Photo & Video</span></button><button onClick={() => fileInputRef.current.click()} className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 rounded-2xl transition-all"><div className="w-10 h-10 bg-rose-50 text-rose-500 rounded-xl flex items-center justify-center"><FileText size={20} /></div><span className="text-xs font-bold text-slate-700">Document</span></button></motion.div></>}</AnimatePresence>
-                <div className="flex items-center gap-1 text-[#54656F]"><button onClick={() => setIsEmojiOpen(!isEmojiOpen)} className={cn("p-2 rounded-full transition-colors", isEmojiOpen ? "bg-[#D9DBDF] text-slate-900" : "hover:bg-[#D9DBDF]")}><Smile size={24} /></button><button onClick={() => setIsMediaMenuOpen(!isMediaMenuOpen)} className={cn("p-2 rounded-full transition-colors", isMediaMenuOpen ? "bg-[#D9DBDF] text-slate-900" : "hover:bg-[#D9DBDF]")}><Paperclip size={24} /></button></div>
-                <div className="flex-1 bg-white rounded-lg px-3 py-2 shadow-sm"><input type="text" placeholder="Type a message" className="w-full bg-transparent border-none text-[15px] text-[#3B4A54] focus:outline-none" value={inputText} onChange={(e) => setInputText(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()} /></div>
-                <div className="flex items-center text-[#54656F]">{inputText.trim() ? <button onClick={handleSendMessage} className="p-2 hover:bg-[#D9DBDF] rounded-full transition-colors text-[#54656F]"><Send size={24} /></button> : <button className="p-2 hover:bg-[#D9DBDF] rounded-full transition-colors"><Mic size={24} /></button>}</div>
-              </div>
-            </div>
-          )}
+                <div className="flex-1 overflow-y-auto p-8 space-y-2 no-scrollbar bg-[#EFEAE2]/60">
+                   <div className="flex justify-center mb-6"><div className="bg-[#FFF9C4] px-4 py-2 rounded-lg text-[12.5px] text-[#54656f] text-center shadow-sm max-w-[500px]">Messages are end-to-end encrypted. No one outside of this chat, not even WhatsApp, can read or listen to them.</div></div>
+                   
+                   {messages.map((msg, i) => {
+                     const isOut = msg.direction === 'outbound';
+                     if (msg.type === 'sticker') return (
+                        <div key={msg.id || i} className={cn("flex w-full mb-4", isOut ? "justify-end" : "justify-start")}>
+                           <div className="flex items-end gap-2">
+                              <img src={`${API_URL}${msg.mediaPath}`} className="w-40 h-40 object-contain" />
+                              <span className="text-[10px] text-[#667781] font-medium">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                           </div>
+                        </div>
+                     );
+                     return (
+                        <div key={msg.id || i} className={cn("flex w-full", isOut ? "justify-end" : "justify-start")}>
+                           <div className={cn(
+                              "relative max-w-[65%] min-w-[80px] shadow-[0_1px_1px_rgba(0,0,0,0.1)] px-2 py-1.5",
+                              isOut ? "bg-[#D9FDD3] rounded-l-lg rounded-br-lg" : "bg-white rounded-r-lg rounded-bl-lg",
+                              (msg.type === 'image' || msg.type === 'video') && "p-0 overflow-hidden"
+                           )}>
+                              {msg.type === 'image' && <img src={`${API_URL}${msg.mediaPath}`} className="w-full h-auto max-h-[400px] object-cover" />}
+                              {msg.type === 'video' && <video src={`${API_URL}${msg.mediaPath}`} className="w-full h-auto max-h-[400px] object-cover" />}
+                              {msg.type === 'audio' && (
+                                <div className="p-3 flex items-center gap-3 min-w-[240px]">
+                                   <div className="w-10 h-10 bg-[#008069] text-white rounded-full flex items-center justify-center shrink-0"><Play size={20} className="ml-1 fill-current" /></div>
+                                   <div className="flex-1 h-3 flex items-center gap-0.5">{[...Array(20)].map((_, i) => <div key={i} className="w-0.5 h-full bg-[#008069]/20 rounded-full" />)}</div>
+                                </div>
+                              )}
+                              {msg.type === 'document' && (
+                                <div className="p-3 flex items-center gap-3 min-w-[240px] bg-white rounded-md m-1">
+                                   <div className="w-10 h-10 bg-[#FF5F38] rounded-lg flex items-center justify-center shrink-0"><FileText className="text-white" /></div>
+                                   <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{msg.fileName}</p><p className="text-[11px] text-[#667781] uppercase">PDF • 2 MB</p></div>
+                                   <Download size={20} className="text-[#667781]" />
+                                </div>
+                              )}
+
+                              {msg.content && <p className="text-[14.2px] px-1 py-0.5 leading-relaxed break-words">{msg.content}</p>}
+                              
+                              <div className="flex items-center justify-end gap-1 mt-0.5 px-1">
+                                 <span className="text-[10px] text-[#667781] uppercase">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                 {isOut && <Ticks status={msg.status} />}
+                              </div>
+                           </div>
+                        </div>
+                     );
+                   })}
+                   <div ref={messagesEndRef} className="h-4" />
+                </div>
+
+                {/* PILL INPUT */}
+                <div className="bg-[#F0F2F5] min-h-[62px] px-4 py-2 flex items-center gap-4 relative z-40">
+                   <AnimatePresence>{isEmojiOpen && <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute bottom-full left-4 mb-4"><EmojiPicker onEmojiClick={d => setInputText(p => p + d.emoji)} width={350} height={400} /></motion.div>}</AnimatePresence>
+                   
+                   <div className="flex-1 bg-white h-[46px] rounded-full px-2 flex items-center gap-1 shadow-sm">
+                      {isRecording ? (
+                        <div className="flex-1 flex items-center justify-between px-4">
+                           <div className="flex items-center gap-3"><div className="w-2 h-2 bg-rose-500 rounded-full animate-pulse" /><span className="text-sm font-medium">{Math.floor(recordingTime/60)}:{(recordingTime%60).toString().padStart(2,'0')}</span></div>
+                           <div className="flex items-center gap-4"><button onClick={() => stopRecording(false)} className="text-rose-500"><Trash2 size={20} /></button><button onClick={() => stopRecording(true)} className="text-[#008069]"><Send size={20} /></button></div>
+                        </div>
+                      ) : (
+                        <>
+                           <button onClick={() => setIsEmojiOpen(!isEmojiOpen)} className="text-[#54656F] p-2 hover:bg-slate-100 rounded-full"><Smile size={24} /></button>
+                           <button onClick={() => fileInputRef.current.click()} className="text-[#54656F] p-2 hover:bg-slate-100 rounded-full"><Plus size={24} /></button>
+                           <input type="text" placeholder="Type a message" className="flex-1 bg-transparent border-none text-[15px] focus:outline-none px-2" value={inputText} onChange={e => setInputText(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleSendMessage()} />
+                           <div className="w-10 h-10 flex items-center justify-center">
+                              {inputText.trim() ? <button onClick={handleSendMessage} className="text-[#008069]"><Send size={24} /></button> : <button onClick={startRecording} className="text-[#54656F]"><Mic size={24} /></button>}
+                           </div>
+                        </>
+                      )}
+                   </div>
+                </div>
+             </div>
+           )}
         </div>
     </div>
   );
