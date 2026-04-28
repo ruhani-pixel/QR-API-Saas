@@ -93,9 +93,10 @@ export default function InboxPage() {
   };
 
   const loadChatHistory = async (chat) => {
+    if (!activeDevice) return;
     setSelectedChat(chat);
     try {
-      const res = await fetch(`${API_URL}/api/messages?remoteJid=${chat.remoteJid}`);
+      const res = await fetch(`${API_URL}/api/messages?sessionId=${activeDevice.sessionId}&remoteJid=${chat.remoteJid}`);
       const data = await res.json();
       // Reverse because we fetch desc but display asc
       setMessages(data.reverse());

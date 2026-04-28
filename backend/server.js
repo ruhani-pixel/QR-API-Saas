@@ -89,31 +89,49 @@ const whatsapp = new Whatsapp({
   },
   onMessageReceived: async (msg) => {
     console.log(`[Session:${msg.sessionId}] New Message from ${msg.key.remoteJid}`);
-    
-    // Save to DB
-    try {
-      const content = msg.message?.conversation || 
-                      msg.message?.extendedTextMessage?.text || 
-                      (msg.message?.imageMessage ? '[Image]' : '[Media]');
-      
-      await prisma.message.create({
-        data: {
-          sessionId: msg.sessionId,
-          remoteJid: msg.key.remoteJid,
-          pushName: msg.pushName || 'WhatsApp User',
-          content: content,
-          direction: msg.key.fromMe ? 'outbound' : 'inbound',
-          status: 'delivered',
-          timestamp: new Date()
-        }
-      });
-      
-      io.emit('message:incoming', msg);
-    } catch (e) {
-      console.error('Failed to save message:', e);
+    await saveOrUpdateMessage(msg);
+    io.emit('message:incoming', msg);
+  },
+  onHistoryReceived: async (data) => {
+    console.log(`[Session:${data.sessionId}] Syncing ${data.messages.length} historical messages...`);
+    for (const msg of data.messages) {
+      await saveOrUpdateMessage(msg);
     }
+    console.log(`[Session:${data.sessionId}] History sync completed.`);
   }
 });
+
+async function saveOrUpdateMessage(msg) {
+  try {
+    const content = msg.message?.conversation || 
+                    msg.message?.extendedTextMessage?.text || 
+                    (msg.message?.imageMessage ? '[Image]' : '[Media]') || 
+                    '';
+    
+    const whatsappId = msg.key.id;
+    const timestamp = msg.messageTimestamp ? new Date(msg.messageTimestamp * 1000) : new Date();
+
+    await prisma.message.upsert({
+      where: { whatsappId: whatsappId },
+      update: {
+        status: 'delivered', // Update status if message already exists
+      },
+      create: {
+        whatsappId: whatsappId,
+        sessionId: msg.sessionId,
+        remoteJid: msg.key.remoteJid,
+        pushName: msg.pushName || 'WhatsApp User',
+        content: content,
+        direction: msg.key.fromMe ? 'outbound' : 'inbound',
+        status: 'delivered',
+        timestamp: timestamp,
+        messageTimestamp: msg.messageTimestamp ? Number(msg.messageTimestamp) : null
+      }
+    });
+  } catch (e) {
+    // console.error('Failed to save message:', e);
+  }
+}
 
 console.log('✅ Whatsapp Engine Initialized');
 
@@ -255,8 +273,11 @@ app.post('/api/message/send', async (req, res) => {
     });
 
     // Save outbound message to DB
-    await prisma.message.create({
-      data: {
+    await prisma.message.upsert({
+      where: { whatsappId: response.key.id },
+      update: { status: 'sent' },
+      create: {
+        whatsappId: response.key.id,
         sessionId,
         remoteJid: to.includes('@s.whatsapp.net') ? to : `${to}@s.whatsapp.net`,
         pushName: 'Me',

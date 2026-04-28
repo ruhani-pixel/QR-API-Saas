@@ -56,6 +56,7 @@ model MessageLog {
 
 model Message {
   id               String    @id @default(cuid())
+  whatsappId       String?   @unique
   sessionId        String
   remoteJid        String
   pushName         String?
@@ -64,6 +65,7 @@ model Message {
   direction        String    // inbound | outbound
   status           String    @default("delivered") // pending | sent | delivered | read | failed
   timestamp        DateTime  @default(now())
+  messageTimestamp Int?      // Original WhatsApp timestamp
   
   device           Device    @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
 }

@@ -256,10 +256,6 @@ export class Whatsapp {
           if (events["messages.upsert"]) {
             const msg = events["messages.upsert"]
               .messages?.[0] as unknown as MessageReceived;
-            if (msg?.message?.protocolMessage) {
-              // ignore history sync messages
-              return;
-            }
             msg.sessionId = sessionId;
             msg.saveImage = (path) => saveImageHandler(msg, path);
             msg.saveVideo = (path) => saveVideoHandler(msg, path);
@@ -269,6 +265,17 @@ export class Whatsapp {
               ...msg,
             });
             options.onMessageReceived?.(msg);
+          }
+          if (events["messaging-history.set"]) {
+            const { messages } = events["messaging-history.set"];
+            const formattedMessages = messages.map((m: any) => {
+              m.sessionId = sessionId;
+              return m as MessageReceived;
+            });
+            this.callback.get(CALLBACK_KEY.ON_HISTORY_RECEIVED)?.({
+              sessionId,
+              messages: formattedMessages,
+            });
           }
         });
         return sock;
@@ -409,10 +416,6 @@ export class Whatsapp {
           if (events["messages.upsert"]) {
             const msg = events["messages.upsert"]
               .messages?.[0] as unknown as MessageReceived;
-            if (msg?.message?.protocolMessage) {
-              // ignore history sync messages
-              return;
-            }
             msg.sessionId = sessionId;
             msg.saveImage = (path) => saveImageHandler(msg, path);
             msg.saveVideo = (path) => saveVideoHandler(msg, path);
@@ -422,6 +425,17 @@ export class Whatsapp {
               ...msg,
             });
             options.onMessageReceived?.(msg);
+          }
+          if (events["messaging-history.set"]) {
+            const { messages } = events["messaging-history.set"];
+            const formattedMessages = messages.map((m: any) => {
+              m.sessionId = sessionId;
+              return m as MessageReceived;
+            });
+            this.callback.get(CALLBACK_KEY.ON_HISTORY_RECEIVED)?.({
+              sessionId,
+              messages: formattedMessages,
+            });
           }
         });
         return sock;
@@ -475,6 +489,12 @@ export class Whatsapp {
       this.callback.set(
         CALLBACK_KEY.ON_MESSAGE_RECEIVED,
         props.onMessageReceived
+      );
+    }
+    if (props.onHistoryReceived) {
+      this.callback.set(
+        CALLBACK_KEY.ON_HISTORY_RECEIVED,
+        props.onHistoryReceived
       );
     }
     if (props.onQRUpdated) {
