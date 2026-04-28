@@ -17,5 +17,6 @@ export type WhatsappConstructorProps = {
   onMessageUpdated?: (data: MessageUpdated) => any;
   onMessageReceived?: (msg: MessageReceived) => any;
   onHistoryReceived?: (data: { sessionId: string; messages: MessageReceived[] }) => any;
+  onPresenceUpdated?: (data: { sessionId: string; remoteJid: string; presence: any }) => any;
   onQRUpdated?: (qr: string) => any;
 };

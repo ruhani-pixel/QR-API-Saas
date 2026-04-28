@@ -110,6 +110,14 @@ const whatsapp = new Whatsapp({
     } catch (e) {
       // Ignore if message not found
     }
+  },
+  onPresenceUpdated: async (data) => {
+    // console.log(`[Session:${data.sessionId}] Presence update for ${data.remoteJid}`);
+    io.emit('presence:update', { 
+      sessionId: data.sessionId, 
+      remoteJid: data.remoteJid, 
+      presence: data.presence 
+    });
   }
 });
 

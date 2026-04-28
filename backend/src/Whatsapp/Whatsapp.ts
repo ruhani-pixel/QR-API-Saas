@@ -277,6 +277,14 @@ export class Whatsapp {
               messages: formattedMessages,
             });
           }
+          if (events["presence.update"]) {
+            const { id, presences } = events["presence.update"];
+            this.callback.get(CALLBACK_KEY.ON_PRESENCE_UPDATED)?.({
+              sessionId,
+              remoteJid: id,
+              presence: presences,
+            });
+          }
         });
         return sock;
       } catch (error) {
@@ -437,6 +445,14 @@ export class Whatsapp {
               messages: formattedMessages,
             });
           }
+          if (events["presence.update"]) {
+            const { id, presences } = events["presence.update"];
+            this.callback.get(CALLBACK_KEY.ON_PRESENCE_UPDATED)?.({
+              sessionId,
+              remoteJid: id,
+              presence: presences,
+            });
+          }
         });
         return sock;
       } catch (error) {
@@ -495,6 +511,12 @@ export class Whatsapp {
       this.callback.set(
         CALLBACK_KEY.ON_HISTORY_RECEIVED,
         props.onHistoryReceived
+      );
+    }
+    if (props.onPresenceUpdated) {
+      this.callback.set(
+        CALLBACK_KEY.ON_PRESENCE_UPDATED,
+        props.onPresenceUpdated
       );
     }
     if (props.onQRUpdated) {

@@ -13,21 +13,15 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
   const pathname = usePathname();
   const isInbox = pathname === '/inbox';
-
-  // Auto-collapse sidebar when entering inbox
-  useEffect(() => {
-    if (isInbox) setIsCollapsed(true);
-  }, [isInbox]);
 
   return (
     <ProtectedRoute>
       <div className="flex h-screen bg-slate-50 bg-grid-pattern overflow-hidden">
-        <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
+        <Sidebar isCollapsed={false} />
         <div className="flex-1 flex flex-col min-w-0 transition-all duration-500">
-          {!isInbox && <Header isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />}
+          {!isInbox && <Header />}
           <main className={cn(
             "flex-1 overflow-y-auto scroll-smooth no-scrollbar",
             isInbox ? "p-0" : "p-6"

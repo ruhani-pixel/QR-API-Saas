@@ -22,6 +22,7 @@ export default function InboxPage() {
   const [activeDevice, setActiveDevice] = useState(null);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
+  const [presences, setPresences] = useState({}); // { remoteJid: { status: 'composing' | 'available' | 'unavailable' } }
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -48,6 +49,13 @@ export default function InboxPage() {
       setMessages(prev => prev.map(m => 
         m.whatsappId === data.whatsappId ? { ...m, status: data.status } : m
       ));
+    });
+
+    socket.on('presence:update', (data) => {
+      setPresences(prev => ({
+        ...prev,
+        [data.remoteJid]: data.presence
+      }));
     });
 
     return () => { socket.disconnect(); };
@@ -298,8 +306,19 @@ export default function InboxPage() {
                     <div>
                       <h2 className="text-xl font-black text-slate-900 tracking-tighter leading-none mb-1">{selectedChat.pushName}</h2>
                       <div className="flex items-center gap-2">
-                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                         <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{selectedChat.remoteJid}</span>
+                         {presences[selectedChat.remoteJid]?.lastKnownPresence === 'composing' ? (
+                           <span className="text-[10px] font-black text-brand-gold uppercase animate-pulse">Typing...</span>
+                         ) : (
+                           <>
+                             <div className={cn(
+                               "w-1.5 h-1.5 rounded-full animate-pulse",
+                               presences[selectedChat.remoteJid]?.lastKnownPresence === 'available' ? "bg-emerald-500" : "bg-slate-300"
+                             )} />
+                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                               {presences[selectedChat.remoteJid]?.lastKnownPresence === 'available' ? 'Online' : 'Offline'}
+                             </span>
+                           </>
+                         )}
                       </div>
                     </div>
                   </div>

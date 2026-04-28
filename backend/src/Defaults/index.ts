@@ -13,6 +13,7 @@ export enum CALLBACK_KEY {
   ON_MESSAGE_UPDATED = "on-message-updated",
   ON_PAIRING_CODE = "on-pairing-code",
   ON_HISTORY_RECEIVED = "on-history-received",
+  ON_PRESENCE_UPDATED = "on-presence-updated",
 }
 
 export abstract class Messages {

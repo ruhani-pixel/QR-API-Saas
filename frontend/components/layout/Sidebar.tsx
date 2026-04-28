@@ -66,13 +66,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: any) {
         )}
       </div>
 
-      {/* Toggle Button Inside Sidebar (Floating) */}
-      <button 
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3 top-24 w-6 h-6 bg-white border border-slate-100 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-900 shadow-md hover:shadow-lg transition-all z-[60]"
-      >
-        {isCollapsed ? <PanelLeftOpen size={12} /> : <PanelLeftClose size={12} />}
-      </button>
+
 
       {/* Navigation */}
       <nav className={cn("flex-1 px-4 space-y-8 overflow-y-auto custom-scrollbar", isCollapsed && "px-2")}>
