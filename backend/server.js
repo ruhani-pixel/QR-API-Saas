@@ -54,6 +54,19 @@ const whatsapp = new Whatsapp({
     io.emit('device:status', { sessionId: sid, status: 'online' });
     updateDeviceStatus(sid, 'online', true);
   },
+  onMessageUpdated: (data) => {
+    // Real-time status update (delivered, read, failed)
+    io.emit('message:status', { 
+      sessionId: data.sessionId, 
+      whatsappId: data.update.key.id, 
+      status: data.messageStatus 
+    });
+    // Update DB status
+    prisma.message.update({ 
+      where: { whatsappId: data.update.key.id }, 
+      data: { status: data.messageStatus } 
+    }).catch(() => {});
+  },
   onDisconnected: (sessionId, reason) => {
     const sid = typeof sessionId === 'string' ? sessionId : sessionId.sessionId || String(sessionId);
     io.emit('device:status', { sessionId: sid, status: 'offline' });
@@ -90,14 +103,73 @@ async function handleAIAutoReply(msg) {
     if (isNewUser && !device.aiReplyNewUsers) return;
     if (!isNewUser && !device.aiReplyExistingUsers) return;
 
-    const recentMessages = await prisma.message.findMany({ where: { sessionId: msg.sessionId, remoteJid: msg.key.remoteJid }, orderBy: { timestamp: 'desc' }, take: 20 });
-    const chatContext = recentMessages.reverse().map(m => `${m.direction === 'inbound' ? 'User' : 'Assistant'}: ${m.content}`).join('\n');
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const prompt = `System Instructions: ${device.aiInstructions}\n\nChat History:\n${chatContext}\n\nAssistant:`;
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
+    // Show Typing Indicator
+    await whatsapp.sendTypingIndicator({ 
+      sessionId: msg.sessionId, 
+      to: msg.key.remoteJid, 
+      duration: 2000 
+    }).catch(() => {});
+
+    const recentMessages = await prisma.message.findMany({ where: { sessionId: msg.sessionId, remoteJid: msg.key.remoteJid }, orderBy: { timestamp: 'desc' }, take: 10 });
+    const chatContext = recentMessages.reverse().map(m => `${m.direction === 'inbound' ? 'U' : 'A'}: ${m.content}`).join('\n');
+    
+    // TOOL DEFINITION
+    const tools = [
+      {
+        functionDeclarations: [
+          {
+            name: "alertOwner",
+            description: "Owner ko alert bheje jab user ka sawal mushkil ho ya AI ko decision lene mein help chahiye ho.",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                issue: { type: "STRING", description: "Problem ya user ka sawal jo owner ko batana hai." }
+              },
+              required: ["issue"]
+            }
+          }
+        ]
+      }
+    ];
+
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-2.0-flash-lite",
+      generationConfig: { maxOutputTokens: 500, temperature: 0.7 },
+      tools: tools
+    });
+
+    const prompt = `Strict Instructions: YOU ARE A HUMAN ASSISTANT. NEVER MENTION AI, ROBOT, OR MODEL. TALK LIKE A REAL PERSON.
+If you are confused or need owner's permission, use the 'alertOwner' tool immediately and tell user "Ek minute rukiye, main Sar se baat karwata hoon."
+DO NOT GIVE ROBOTIC ANSWERS.
+System Context: ${device.aiInstructions}\n\nChat History:\n${chatContext}\n\nAssistant:`;
+
+    // MEDIA SUPPORT
+    let parts = [{ text: prompt }];
+    const lastMsg = recentMessages[recentMessages.length - 1];
+    if (lastMsg && lastMsg.mediaPath && lastMsg.direction === 'inbound') {
+      const fpath = path.join(__dirname, lastMsg.mediaPath);
+      if (fs.existsSync(fpath)) {
+        const b64 = fs.readFileSync(fpath).toString('base64');
+        const mimeType = lastMsg.type === 'image' ? 'image/jpeg' : lastMsg.type === 'video' ? 'video/mp4' : 'application/pdf';
+        parts.push({ inlineData: { data: b64, mimeType } });
+      }
+    }
+
+    const result = await model.generateContent(parts);
+    const response = result.response;
+    const call = response.functionCalls()?.[0];
+
+    if (call && call.name === "alertOwner") {
+      const ownerNum = device.ownerNumber || '919876543210'; // Fallback
+      const alertText = `🚨 *AI ALERT* (Node: ${device.name})\n\nUser: ${msg.key.remoteJid}\nIssue: ${call.args.issue}\n\nAI is waiting for your response.`;
+      await whatsapp.sendText({ sessionId: msg.sessionId, to: ownerNum, text: alertText }).catch(() => {});
+      await whatsapp.sendText({ sessionId: msg.sessionId, to: msg.key.remoteJid, text: "Ek second rukiye, main Sar se confirm karke batata hoon. 🙏" });
+      return;
+    }
+
+    const responseText = response.text();
     if (responseText) await whatsapp.sendText({ sessionId: msg.sessionId, to: msg.key.remoteJid, text: responseText });
-  } catch (e) {}
+  } catch (e) { console.error('AI Error:', e); }
 }
 
 async function saveOrUpdateMessage(msg) {
@@ -184,6 +256,37 @@ async function updateDeviceStatus(sessionId, status, clearQR = false) {
 }
 
 // ENDPOINTS
+app.post('/api/session/start', async (req, res) => {
+  const { sessionId, name, ownerNumber } = req.body;
+  try {
+    await prisma.device.upsert({
+      where: { sessionId },
+      update: { name, ownerNumber, status: 'connecting' },
+      create: { sessionId, name, ownerNumber, status: 'connecting' }
+    });
+    await whatsapp.startSession(sessionId);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/session/logout', async (req, res) => {
+  const { sessionId } = req.body;
+  try {
+    await whatsapp.deleteSession(sessionId);
+    await prisma.device.update({ where: { sessionId }, data: { status: 'offline' } });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/session/delete', async (req, res) => {
+  const { sessionId } = req.body;
+  try {
+    await whatsapp.deleteSession(sessionId);
+    await prisma.device.delete({ where: { sessionId } });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/sessions', async (req, res) => {
   const sessions = await prisma.device.findMany();
   res.json(sessions);
@@ -237,11 +340,13 @@ app.post('/api/ai/config', async (req, res) => {
 });
 
 app.post('/api/ai/test', async (req, res) => {
-  const { instructions, message, history = [] } = req.body;
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const chatContext = history.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n');
-    const prompt = `System Instructions: ${instructions}\n\nChat History:\n${chatContext}\nUser: ${message}\nAssistant:`;
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-2.0-flash-lite",
+      generationConfig: { maxOutputTokens: 500, temperature: 0.7 }
+    });
+    const chatContext = history.map(m => `${m.role === 'user' ? 'U' : 'A'}: ${m.content}`).join('\n');
+    const prompt = `Strict Instructions: DIRECT REPLY ONLY. NO THINKING PROCESS.\n\nSystem Instructions: ${instructions}\n\nChat History:\n${chatContext}\nUser: ${message}\nAssistant:`;
     const result = await model.generateContent(prompt);
     res.json({ response: result.response.text() });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -298,6 +403,14 @@ app.post('/api/message/send', async (req, res) => {
   const { sessionId, to, text } = req.body;
   try {
     await whatsapp.sendText({ sessionId, to, text });
+    res.json({ success: true });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.post('/api/message/typing', async (req, res) => {
+  const { sessionId, to, duration = 3000 } = req.body;
+  try {
+    await whatsapp.sendTypingIndicator({ sessionId, to, duration });
     res.json({ success: true });
   } catch (error) { res.status(500).json({ error: error.message }); }
 });

@@ -48,9 +48,31 @@ export default function InboxPage() {
   useEffect(() => {
     if (!selectedSessionId) return;
     fetchChats();
-    socket.on('message:incoming', (data) => { if (data.sessionId === selectedSessionId) { if (selectedChat?.id === data.key.remoteJid) fetchChatHistory(selectedChat.id); fetchChats(); } });
+    socket.on('message:incoming', (data) => { 
+      if (data.sessionId === selectedSessionId) { 
+        if (selectedChat?.id === data.key.remoteJid) {
+          setMessages(prev => [...prev, {
+            whatsappId: data.key.id,
+            content: data.message?.conversation || data.message?.extendedTextMessage?.text || '[Media]',
+            direction: data.key.fromMe ? 'outbound' : 'inbound',
+            timestamp: new Date(),
+            status: 'delivered'
+          }]);
+        }
+        fetchChats(); 
+      } 
+    });
+    socket.on('message:status', (data) => {
+      if (data.sessionId === selectedSessionId) {
+        setMessages(prev => prev.map(m => m.whatsappId === data.whatsappId ? { ...m, status: data.status } : m));
+      }
+    });
     socket.on('history:synced', (data) => { if (data.sessionId === selectedSessionId) fetchChats(); });
-    return () => { socket.off('message:incoming'); socket.off('history:synced'); };
+    return () => { 
+      socket.off('message:incoming'); 
+      socket.off('message:status');
+      socket.off('history:synced'); 
+    };
   }, [selectedSessionId, selectedChat]);
 
   useEffect(() => {

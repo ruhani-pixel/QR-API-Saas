@@ -20,6 +20,7 @@ model Device {
   sessionId      String   @unique
   status         String   @default("offline") // online | offline | connecting
   currentQR      String?
+  ownerNumber    String?
   aiEnabled           Boolean  @default(false)
   aiInstructions      String?
   aiReplyNewUsers     Boolean  @default(true)

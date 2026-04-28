@@ -25,6 +25,7 @@ export default function DevicesPage() {
   const [qrCode, setQrCode] = useState(null);
   const [countdown, setCountdown] = useState(60);
   const [deviceName, setDeviceName] = useState('');
+  const [ownerNumber, setOwnerNumber] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [socketConnected, setSocketConnected] = useState(false);
@@ -109,6 +110,7 @@ export default function DevicesPage() {
     setActiveSessionId(newId);
     activeSessionIdRef.current = newId;
     setDeviceName('');
+    setOwnerNumber('');
     setQrCode(null);
     setCountdown(60);
     setModalStep('name');
@@ -126,7 +128,11 @@ export default function DevicesPage() {
       await fetch(`${API_URL}/api/session/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: activeSessionIdRef.current, name: deviceName })
+        body: JSON.stringify({ 
+          sessionId: activeSessionIdRef.current, 
+          name: deviceName,
+          ownerNumber: ownerNumber 
+        })
       });
     } catch (e) {
       toast.error('Connection error');
@@ -320,17 +326,34 @@ export default function DevicesPage() {
                     </div>
                     
                     <div className="space-y-4">
-                       <input 
-                         autoFocus
-                         value={deviceName}
-                         onChange={e => setDeviceName(e.target.value)}
-                         placeholder="e.g. Sales Team Alpha"
-                         className="w-full bg-slate-50 border-none rounded-2xl p-5 text-sm font-bold focus:ring-2 ring-orange-100 outline-none transition-all"
-                         onKeyPress={e => e.key === 'Enter' && generateQR()}
-                       />
+                       <div className="space-y-1.5 text-left">
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Node Identity</label>
+                          <input 
+                            autoFocus
+                            value={deviceName}
+                            onChange={e => setDeviceName(e.target.value)}
+                            placeholder="e.g. Sales Team Alpha"
+                            className="w-full bg-slate-50 border-none rounded-2xl p-5 text-sm font-bold focus:ring-2 ring-orange-100 outline-none transition-all"
+                            onKeyPress={e => e.key === 'Enter' && generateQR()}
+                          />
+                       </div>
+                       <div className="space-y-1.5 text-left">
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Owner WhatsApp (For Alerts)</label>
+                          <div className="relative">
+                             <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">+91</div>
+                             <input 
+                                value={ownerNumber}
+                                onChange={e => setOwnerNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                                placeholder="9876543210"
+                                className="w-full bg-slate-50 border-none rounded-2xl p-5 pl-12 text-sm font-bold focus:ring-2 ring-orange-100 outline-none transition-all"
+                                onKeyPress={e => e.key === 'Enter' && generateQR()}
+                             />
+                          </div>
+                          <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tight mt-1 ml-1 opacity-60">AI is number par emergency alerts bhejega.</p>
+                       </div>
                        <button 
                          onClick={generateQR}
-                         className="accent-button w-full flex items-center justify-center gap-2"
+                         className="accent-button w-full flex items-center justify-center gap-2 mt-2"
                        >
                          Generate Link <ChevronRight size={18} />
                        </button>
