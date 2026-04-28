@@ -98,6 +98,18 @@ const whatsapp = new Whatsapp({
       await saveOrUpdateMessage(msg);
     }
     console.log(`[Session:${data.sessionId}] History sync completed.`);
+  },
+  onMessageUpdated: async (data) => {
+    console.log(`[Session:${data.sessionId}] Message status updated: ${data.key.id} -> ${data.messageStatus}`);
+    try {
+      await prisma.message.update({
+        where: { whatsappId: data.key.id },
+        data: { status: data.messageStatus }
+      });
+      io.emit('message:status', { whatsappId: data.key.id, status: data.messageStatus });
+    } catch (e) {
+      // Ignore if message not found
+    }
   }
 });
 

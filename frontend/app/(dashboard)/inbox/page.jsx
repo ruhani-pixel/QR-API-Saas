@@ -32,7 +32,7 @@ export default function InboxPage() {
       // If message is for current chat, add it
       if (selectedChat && msg.key.remoteJid === selectedChat.remoteJid) {
         const formattedMsg = {
-          id: msg.key.id,
+          whatsappId: msg.key.id,
           content: msg.message?.conversation || msg.message?.extendedTextMessage?.text || '[Media]',
           direction: msg.key.fromMe ? 'outbound' : 'inbound',
           timestamp: new Date(),
@@ -42,6 +42,12 @@ export default function InboxPage() {
       }
       // Refresh chat list to show latest message
       fetchChats();
+    });
+
+    socket.on('message:status', (data) => {
+      setMessages(prev => prev.map(m => 
+        m.whatsappId === data.whatsappId ? { ...m, status: data.status } : m
+      ));
     });
 
     return () => { socket.disconnect(); };
@@ -111,8 +117,9 @@ export default function InboxPage() {
     const textToSend = inputText.trim();
     setInputText('');
     
+    const tempId = Date.now().toString();
     const tempMsg = {
-      id: Date.now().toString(),
+      whatsappId: tempId,
       content: textToSend,
       direction: 'outbound',
       timestamp: new Date(),
@@ -133,14 +140,14 @@ export default function InboxPage() {
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
       
-      // Update the temp message to sent status
-      setMessages(prev => prev.map(m => m.id === tempMsg.id ? { ...m, status: 'sent' } : m));
+      // Update the temp message to sent status and real whatsappId
+      setMessages(prev => prev.map(m => m.whatsappId === tempId ? { ...m, status: 'sent', whatsappId: data.data.key.id } : m));
       // Refresh chats to show the new message as last message
       fetchChats();
     } catch (e) {
       toast.error('Failed to send: ' + e.message);
       // Mark as failed
-      setMessages(prev => prev.map(m => m.id === tempMsg.id ? { ...m, status: 'failed' } : m));
+      setMessages(prev => prev.map(m => m.whatsappId === tempId ? { ...m, status: 'failed' } : m));
     }
   };
 
@@ -307,7 +314,7 @@ export default function InboxPage() {
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-10 space-y-6 bg-slate-50/30">
                   {messages.map((msg, i) => (
                     <motion.div
-                      key={msg.id}
+                      key={msg.whatsappId || i}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.05 }}
@@ -331,7 +338,13 @@ export default function InboxPage() {
                             {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                           {msg.direction === 'outbound' && (
-                            <CheckCheck size={12} className={msg.status === 'read' ? "text-brand-gold" : "text-slate-500"} />
+                            <div className="ml-1">
+                              {msg.status === 'server' || msg.status === 'sent' ? (
+                                <Check size={12} className="text-slate-500" />
+                              ) : (
+                                <CheckCheck size={12} className={msg.status === 'read' ? "text-brand-gold" : "text-slate-500"} />
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>
