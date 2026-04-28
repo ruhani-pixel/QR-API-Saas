@@ -37,6 +37,9 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+// SMART RECOVERY TRACKER
+const retryCounts = {};
+
 const whatsapp = new Whatsapp({
   adapter: new SQLiteAdapter({ databasePath: './sessions.db' }),
   debugLevel: 'silent',
@@ -61,6 +64,7 @@ const whatsapp = new Whatsapp({
     
     if (cleanSid) {
       console.log(`[SESSION] Connected: ${cleanSid}`);
+      retryCounts[cleanSid] = 0; // Reset retries on success
       // First update DB, then emit to ensure frontend polling sees it
       await updateDeviceStatus(cleanSid, 'online', true);
       io.emit('device:status', { sessionId: cleanSid, status: 'online' });
@@ -82,25 +86,49 @@ const whatsapp = new Whatsapp({
       data: { status: data.messageStatus } 
     }).catch(() => {});
   },
-  onDisconnected: (sessionId, reason) => {
-    const cleanSid = String((typeof sessionId === 'object' ? sessionId.sessionId : sessionId) || '').toLowerCase();
-    if (cleanSid) {
-      console.log(`[SESSION] Disconnected: ${cleanSid} (Reason: ${reason})`);
+  onDisconnected: async (sessionId, reason) => {
+    const sid = String((typeof sessionId === 'object' ? sessionId.sessionId : sessionId) || '').toLowerCase();
+    if (!sid) return;
+
+    console.log(`[SESSION] Disconnected: ${sid} (Reason: ${reason})`);
+    
+    // PERMANENT ERRORS: 440 (Session Expired), 401 (Unauthorized)
+    // DO NOT RETRY - DELETE SESSION DATA
+    const isPermanent = [401, 440, 403].includes(Number(reason));
+    
+    if (isPermanent) {
+      console.log(`[SESSION] ❌ Permanent failure for ${sid}. Stopping recovery.`);
+      retryCounts[sid] = 0;
+      updateDeviceStatus(sid, 'offline');
+      io.emit('device:status', { sessionId: sid, status: 'offline' });
+      return;
+    }
+
+    // TEMPORARY ERRORS: 515 (Restarting), 440 (Stream error), etc.
+    const isTemporary = [515, 408, 503, 500].includes(Number(reason)) || !reason;
+    
+    if (isTemporary) {
+      // Limit retries to prevent server overload
+      retryCounts[sid] = (retryCounts[sid] || 0) + 1;
       
-      // Codes like 515 (Restarting), 440 (Stream error) are temporary.
-      // Auto-retrigger connection instead of staying offline.
-      const isTemporary = [515, 440, 503, 500].includes(Number(reason)) || !reason;
-      
-      if (isTemporary) {
-        console.log(`[SESSION] Attempting Auto-recovery for ${cleanSid}...`);
-        updateDeviceStatus(cleanSid, 'connecting');
-        setTimeout(() => {
-          whatsapp.startSession(cleanSid).catch(() => {});
-        }, 2500);
-      } else {
-        io.emit('device:status', { sessionId: cleanSid, status: 'offline' });
-        updateDeviceStatus(cleanSid, 'offline');
+      if (retryCounts[sid] > 3) {
+        console.log(`[SESSION] ⛔ Max retries (3) reached for ${sid}. Giving up.`);
+        retryCounts[sid] = 0;
+        updateDeviceStatus(sid, 'offline');
+        io.emit('device:status', { sessionId: sid, status: 'offline' });
+        return;
       }
+
+      const delay = retryCounts[sid] * 5000; // 5s, 10s, 15s backoff
+      console.log(`[SESSION] Retry ${retryCounts[sid]}/3 for ${sid} in ${delay/1000}s...`);
+      
+      updateDeviceStatus(sid, 'connecting');
+      setTimeout(() => {
+        whatsapp.startSession(sid).catch(() => {});
+      }, delay);
+    } else {
+      io.emit('device:status', { sessionId: sid, status: 'offline' });
+      updateDeviceStatus(sid, 'offline');
     }
   },
   onMessageReceived: async (msg) => {
