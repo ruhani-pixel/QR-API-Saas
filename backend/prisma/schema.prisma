@@ -31,18 +31,32 @@ model Device {
 }
 
 model Campaign {
-  id          String        @id @default(cuid())
-  name        String
-  message     String
-  mediaPath   String?
-  status      String        @default("pending") // pending | active | paused | completed | stopped
-  totalSent   Int           @default(0)
-  totalFailed Int           @default(0)
-  totalNumbers Int          @default(0)
-  startedAt   DateTime?
-  completedAt DateTime?
-  createdAt   DateTime      @default(now())
-  logs        MessageLog[]
+  id              String        @id @default(cuid())
+  name            String
+  message         String?
+  mediaPath       String?
+  selectedDevices String?       // JSON array of sessionIds
+  status          String        @default("pending") // pending | active | paused | completed | stopped
+  totalSent       Int           @default(0)
+  totalFailed      Int           @default(0)
+  totalNumbers    Int           @default(0)
+  safetyConfig    String?       // JSON: { minDelay, maxDelay, burstLimit, restPeriod }
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  logs            MessageLog[]
+  recipients      CampaignRecipient[]
+}
+
+model CampaignRecipient {
+  id               String    @id @default(cuid())
+  campaignId       String
+  number           String
+  message          String?   // Personalized message
+  scheduledAt      DateTime? // Per-message scheduled time
+  nodeId           String?   // Force specific SIM/Node
+  status           String    @default("pending") // pending | sent | failed
+  campaign         Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 }
 
 model MessageLog {

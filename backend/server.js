@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const { Whatsapp, SQLiteAdapter } = require('./dist');
+const CronEngine = require('./cronEngine');
 const { PrismaClient } = require('@prisma/client');
 const multer = require('multer');
 const path = require('path');
@@ -68,7 +69,7 @@ const whatsapp = new Whatsapp({
     if (data.contacts) {
       for (const contact of data.contacts) {
         const name = contact.name || contact.verifiedName || contact.notify || contact.shortName;
-        if (name) await updateContact(data.sessionId, contact.id, { name: contact.name || contact.verifiedName || contact.shortName, pushName: contact.notify });
+        if (name) await updateContact(data.sessionId, contact.id, { name, pushName: contact.notify });
       }
     }
     for (const msg of data.messages) await saveOrUpdateMessage(msg);
@@ -76,56 +77,26 @@ const whatsapp = new Whatsapp({
   }
 });
 
+const cronEngine = new CronEngine(whatsapp);
+
 async function handleAIAutoReply(msg) {
   try {
     const device = await prisma.device.findUnique({ where: { sessionId: msg.sessionId } });
     if (!device || !device.aiEnabled || !device.aiInstructions) return;
-
-    // Contact Level Override Check
     const contact = await prisma.contact.findUnique({ where: { sessionId_remoteJid: { sessionId: msg.sessionId, remoteJid: msg.key.remoteJid } } });
     if (contact && contact.aiEnabled === false) return;
-
-    // Check if new/existing user based on message history
     const historyCount = await prisma.message.count({ where: { sessionId: msg.sessionId, remoteJid: msg.key.remoteJid } });
     const isNewUser = historyCount <= 1;
-
     if (isNewUser && !device.aiReplyNewUsers) return;
     if (!isNewUser && !device.aiReplyExistingUsers) return;
 
-    // Fetch Last 20 messages for context
-    const recentMessages = await prisma.message.findMany({
-      where: { sessionId: msg.sessionId, remoteJid: msg.key.remoteJid },
-      orderBy: { timestamp: 'desc' },
-      take: 20
-    });
-    
+    const recentMessages = await prisma.message.findMany({ where: { sessionId: msg.sessionId, remoteJid: msg.key.remoteJid }, orderBy: { timestamp: 'desc' }, take: 20 });
     const chatContext = recentMessages.reverse().map(m => `${m.direction === 'inbound' ? 'User' : 'Assistant'}: ${m.content}`).join('\n');
-
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-lite-latest" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const prompt = `System Instructions: ${device.aiInstructions}\n\nChat History:\n${chatContext}\n\nAssistant:`;
-    
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
-    
-    if (responseText) {
-      await whatsapp.sendText({ sessionId: msg.sessionId, to: msg.key.remoteJid, text: responseText });
-    }
-  } catch (e) { console.error('AI Reply Error:', e); }
-}
-
-async function updateContact(sessionId, remoteJid, data) {
-  try {
-    const updateData = {};
-    if (data.name) updateData.name = data.name;
-    if (data.pushName) updateData.pushName = data.pushName;
-    if (data.profilePic) updateData.profilePic = data.profilePic;
-    if (data.aiEnabled !== undefined) updateData.aiEnabled = data.aiEnabled;
-
-    await prisma.contact.upsert({
-      where: { sessionId_remoteJid: { sessionId, remoteJid } },
-      update: updateData,
-      create: { sessionId, remoteJid, aiEnabled: true, ...data }
-    });
+    if (responseText) await whatsapp.sendText({ sessionId: msg.sessionId, to: msg.key.remoteJid, text: responseText });
   } catch (e) {}
 }
 
@@ -180,7 +151,83 @@ async function saveOrUpdateMessage(msg) {
   } catch (e) {}
 }
 
-// AI ENDPOINTS
+async function updateContact(sessionId, remoteJid, data) {
+  try {
+    const updateData = {};
+    if (data.name) updateData.name = data.name;
+    if (data.pushName) updateData.pushName = data.pushName;
+    if (data.profilePic) updateData.profilePic = data.profilePic;
+
+    await prisma.contact.upsert({
+      where: { sessionId_remoteJid: { sessionId, remoteJid } },
+      update: updateData,
+      create: { sessionId, remoteJid, aiEnabled: true, ...data }
+    });
+  } catch (e) {}
+}
+
+async function syncProfilePic(sessionId, remoteJid) {
+  try {
+    const session = await whatsapp.getSessionById(sessionId);
+    if (!session) return;
+    const url = await session.sock.profilePictureUrl(remoteJid, 'image').catch(() => null);
+    if (url) await updateContact(sessionId, remoteJid, { profilePic: url });
+  } catch (e) {}
+}
+
+async function updateDeviceStatus(sessionId, status, clearQR = false) {
+  try {
+    const data = { status };
+    if (clearQR) data.currentQR = null;
+    await prisma.device.upsert({ where: { sessionId }, update: data, create: { sessionId, name: `Node ${sessionId}`, status, currentQR: null } });
+  } catch (e) {}
+}
+
+// ENDPOINTS
+app.get('/api/sessions', async (req, res) => {
+  const sessions = await prisma.device.findMany();
+  res.json(sessions);
+});
+
+app.post('/api/campaign/create', upload.single('media'), async (req, res) => {
+  const { name, message, selectedDevices, safetyConfig, recipients } = req.body;
+  try {
+    const campaign = await prisma.campaign.create({
+      data: {
+        name,
+        message,
+        mediaPath: req.file ? `/uploads/${req.file.filename}` : null,
+        selectedDevices,
+        safetyConfig,
+        totalNumbers: JSON.parse(recipients).length,
+        status: 'pending'
+      }
+    });
+    const recipientData = JSON.parse(recipients).map(r => ({
+      campaignId: campaign.id,
+      number: r.number,
+      message: r.message || null,
+      scheduledAt: r.scheduledAt ? new Date(r.scheduledAt) : null,
+      nodeId: r.nodeId || null
+    }));
+    await prisma.campaignRecipient.createMany({ data: recipientData });
+    res.json({ success: true, campaignId: campaign.id });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/campaigns', async (req, res) => {
+  const campaigns = await prisma.campaign.findMany({ orderBy: { createdAt: 'desc' } });
+  res.json(campaigns);
+});
+
+app.post('/api/campaign/status', async (req, res) => {
+  const { id, status } = req.body;
+  try {
+    await prisma.campaign.update({ where: { id }, data: { status } });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/ai/config', async (req, res) => {
   const { sessionId, aiEnabled, aiInstructions, aiReplyNewUsers, aiReplyExistingUsers } = req.body;
   try {
@@ -189,14 +236,21 @@ app.post('/api/ai/config', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+app.post('/api/ai/test', async (req, res) => {
+  const { instructions, message, history = [] } = req.body;
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const chatContext = history.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n');
+    const prompt = `System Instructions: ${instructions}\n\nChat History:\n${chatContext}\nUser: ${message}\nAssistant:`;
+    const result = await model.generateContent(prompt);
+    res.json({ response: result.response.text() });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/ai/contact-toggle', async (req, res) => {
   const { sessionId, remoteJid, aiEnabled } = req.body;
   try {
-    await prisma.contact.upsert({
-      where: { sessionId_remoteJid: { sessionId, remoteJid } },
-      update: { aiEnabled },
-      create: { sessionId, remoteJid, aiEnabled }
-    });
+    await prisma.contact.upsert({ where: { sessionId_remoteJid: { sessionId, remoteJid } }, update: { aiEnabled }, create: { sessionId, remoteJid, aiEnabled } });
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -207,17 +261,6 @@ app.get('/api/ai/contact-status', async (req, res) => {
     const contact = await prisma.contact.findUnique({ where: { sessionId_remoteJid: { sessionId, remoteJid } } });
     res.json({ aiEnabled: contact ? contact.aiEnabled : true });
   } catch (e) { res.json({ aiEnabled: true }); }
-});
-
-app.post('/api/ai/test', async (req, res) => {
-  const { instructions, message, history = [] } = req.body;
-  try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-lite-latest" });
-    const chatContext = history.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n');
-    const prompt = `System Instructions: ${instructions}\n\nChat History:\n${chatContext}\nUser: ${message}\nAssistant:`;
-    const result = await model.generateContent(prompt);
-    res.json({ response: result.response.text() });
-  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/whatsapp/chats', async (req, res) => {
@@ -245,48 +288,23 @@ app.get('/api/whatsapp/chats', async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-app.get('/api/sessions', async (req, res) => {
-  const sessions = await prisma.device.findMany();
-  res.json(sessions);
+app.get('/api/whatsapp/messages', async (req, res) => {
+  const { sessionId, remoteJid } = req.query;
+  const messages = await prisma.message.findMany({ where: { sessionId, remoteJid }, orderBy: { timestamp: 'asc' } });
+  res.json(messages);
 });
 
-app.post('/api/session/start', async (req, res) => {
-  const { sessionId, name } = req.body;
+app.post('/api/message/send', async (req, res) => {
+  const { sessionId, to, text } = req.body;
   try {
-    await prisma.device.upsert({ where: { sessionId }, update: { name, status: 'connecting' }, create: { sessionId, name, status: 'connecting' } });
-    await whatsapp.startSession(sessionId);
+    await whatsapp.sendText({ sessionId, to, text });
     res.json({ success: true });
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
-
-app.post('/api/session/delete', async (req, res) => {
-  const { sessionId } = req.body;
-  try {
-    await whatsapp.terminateSession(sessionId).catch(() => {});
-    await prisma.device.delete({ where: { sessionId } });
-    res.json({ success: true });
-  } catch (error) { res.status(500).json({ error: error.message }); }
-});
-
-async function updateDeviceStatus(sessionId, status, clearQR = false) {
-  try {
-    const data = { status };
-    if (clearQR) data.currentQR = null;
-    await prisma.device.upsert({ where: { sessionId }, update: data, create: { sessionId, name: `Node ${sessionId}`, status, currentQR: null } });
-  } catch (e) {}
-}
-
-async function syncProfilePic(sessionId, remoteJid) {
-  try {
-    const session = await whatsapp.getSessionById(sessionId);
-    if (!session) return;
-    const url = await session.sock.profilePictureUrl(remoteJid, 'image').catch(() => null);
-    if (url) await updateContact(sessionId, remoteJid, { profilePic: url });
-  } catch (e) {}
-}
 
 const PORT = 3001;
 httpServer.listen(PORT, () => {
   console.log(`🚀 Solid Models Backend running on port 3001`);
   whatsapp.load();
+  cronEngine.start();
 });
