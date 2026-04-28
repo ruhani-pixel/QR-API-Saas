@@ -71,3 +71,15 @@ model Message {
   
   device           Device    @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
 }
+
+model Contact {
+  id               String    @id @default(cuid())
+  sessionId        String
+  remoteJid        String    @unique
+  name             String?
+  pushName         String?
+  profilePic       String?
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([sessionId, remoteJid])
+}
