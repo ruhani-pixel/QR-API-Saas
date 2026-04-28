@@ -62,22 +62,21 @@ const whatsapp = new Whatsapp({
   onMessageReceived: async (msg) => {
     await saveOrUpdateMessage(msg);
     io.emit('message:incoming', msg);
-    // Auto-update contact pushName if it's new
     if (msg.pushName) {
       await updateContact(msg.sessionId, msg.key.remoteJid, { pushName: msg.pushName });
     }
   },
   onHistoryReceived: async (data) => {
-    console.log(`[Session:${data.sessionId}] History sync: ${data.messages.length} messages`);
+    console.log(`[Session:${data.sessionId}] Syncing ${data.messages.length} messages`);
     for (const msg of data.messages) {
       await saveOrUpdateMessage(msg);
     }
-    // Baileys provides contacts in history too
     if (data.contacts) {
       for (const contact of data.contacts) {
         await updateContact(data.sessionId, contact.id, { name: contact.name, pushName: contact.notify });
       }
     }
+    io.emit('history:synced', { sessionId: data.sessionId });
   },
   onMessageUpdated: async (data) => {
     try {
@@ -100,6 +99,14 @@ async function updateContact(sessionId, remoteJid, data) {
   } catch (e) {}
 }
 
+const statusMap = {
+  0: 'pending',
+  1: 'server',
+  2: 'delivered',
+  3: 'read',
+  4: 'played'
+};
+
 async function saveOrUpdateMessage(msg) {
   try {
     const whatsappId = msg.key.id;
@@ -113,14 +120,16 @@ async function saveOrUpdateMessage(msg) {
     else if (msg.message?.videoMessage) { type = 'video'; content = msg.message.videoMessage.caption || ''; fileName = 'video.mp4'; }
     else if (msg.message?.documentMessage) { type = 'document'; content = msg.message.documentMessage.caption || ''; fileName = msg.message.documentMessage.fileName || 'file.pdf'; }
 
+    const status = statusMap[msg.status] || 'delivered';
+
     await prisma.message.upsert({
       where: { whatsappId },
-      update: { status: 'delivered' },
+      update: { status },
       create: {
         whatsappId, sessionId: msg.sessionId, remoteJid: msg.key.remoteJid,
         pushName: msg.pushName || 'WhatsApp User',
         content, type, direction: msg.key.fromMe ? 'outbound' : 'inbound',
-        status: 'delivered', mediaPath, fileName, timestamp,
+        status, mediaPath, fileName, timestamp,
         messageTimestamp: msg.messageTimestamp ? Number(msg.messageTimestamp) : null
       }
     });
@@ -141,14 +150,13 @@ async function updateDeviceStatus(sessionId, status, clearQR = false) {
 
 const cronEngine = new CronEngine(whatsapp, io);
 
-// API Endpoints
 app.post('/api/session/start', async (req, res) => {
   const { sessionId, name } = req.body;
   try {
     await prisma.device.upsert({ where: { sessionId }, update: { name, status: 'connecting' }, create: { sessionId, name, status: 'connecting' } });
     await whatsapp.startSession(sessionId);
     res.json({ success: true });
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
 
 app.get('/api/whatsapp/chats', async (req, res) => {
@@ -157,11 +165,9 @@ app.get('/api/whatsapp/chats', async (req, res) => {
     const where = sessionId ? { sessionId } : {};
     const messages = await prisma.message.findMany({ where, orderBy: { timestamp: 'desc' } });
     const contacts = await prisma.contact.findMany({ where: sessionId ? { sessionId } : {} });
-    
     const contactMap = new Map(contacts.map(c => [c.remoteJid, c]));
     const uniqueChats = [];
     const seenJids = new Set();
-    
     for (const msg of messages) {
       if (!seenJids.has(msg.remoteJid)) {
         seenJids.add(msg.remoteJid);
@@ -185,12 +191,10 @@ app.get('/api/whatsapp/profile-pic', async (req, res) => {
     const { sessionId, remoteJid } = req.query;
     const session = await whatsapp.getSessionById(sessionId);
     if (!session) return res.status(404).json({ error: 'Session not found' });
-    
-    const url = await session.sock.profilePictureUrl(remoteJid, 'image');
+    const url = await session.sock.profilePictureUrl(remoteJid, 'image').catch(() => null);
+    if (url) await updateContact(sessionId, remoteJid, { profilePic: url });
     res.json({ url });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+  } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 app.get('/api/whatsapp/messages', async (req, res) => {
@@ -198,8 +202,7 @@ app.get('/api/whatsapp/messages', async (req, res) => {
     const { sessionId, remoteJid } = req.query;
     const messages = await prisma.message.findMany({ 
       where: { sessionId, remoteJid }, 
-      orderBy: { timestamp: 'asc' },
-      take: 100 
+      orderBy: { timestamp: 'asc' }
     });
     res.json(messages);
   } catch (error) { res.status(500).json({ error: error.message }); }
@@ -212,36 +215,39 @@ app.post('/api/message/send', async (req, res) => {
     await prisma.message.create({
       data: {
         whatsappId: response.key.id, sessionId, remoteJid: to,
-        pushName: 'Me', content: text, direction: 'outbound', status: 'sent', timestamp: new Date()
+        pushName: 'Me', content: text, direction: 'outbound', status: 'server', timestamp: new Date()
       }
     });
     res.json({ success: true, data: response });
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
 
 app.post('/api/message/send-media', upload.single('media'), async (req, res) => {
   const { sessionId, to, caption, type } = req.body;
   try {
+    if (!req.file) throw new Error('No file uploaded');
     const media = fs.readFileSync(req.file.path);
     let response;
-    if (type === 'image') response = await whatsapp.sendImage({ sessionId, to, media, text: caption });
-    else if (type === 'video') response = await whatsapp.sendVideo({ sessionId, to, media, text: caption });
-    else response = await whatsapp.sendDocument({ sessionId, to, media, filename: req.file.originalname, text: caption });
+    if (type === 'image') response = await whatsapp.sendImage({ sessionId, to, media, text: caption || '' });
+    else if (type === 'video') response = await whatsapp.sendVideo({ sessionId, to, media, text: caption || '' });
+    else response = await whatsapp.sendDocument({ sessionId, to, media, filename: req.file.originalname, text: caption || '' });
 
     await prisma.message.create({
       data: {
         whatsappId: response.key.id, sessionId, remoteJid: to, pushName: 'Me',
         content: caption || `[${type.toUpperCase()}]`, type, direction: 'outbound',
-        status: 'sent', mediaPath: `/uploads/${req.file.filename}`, fileName: req.file.originalname, timestamp: new Date()
+        status: 'server', mediaPath: `/uploads/${req.file.filename}`, fileName: req.file.originalname, timestamp: new Date()
       }
     });
     res.json({ success: true });
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
 
 app.get('/api/sessions', async (req, res) => {
-  const sessions = await prisma.device.findMany();
-  res.json(sessions);
+  try {
+    const sessions = await prisma.device.findMany();
+    res.json(sessions);
+  } catch (e) { res.status(500).json([]); }
 });
 
 const PORT = process.env.PORT || 3001;
