@@ -1,3 +1,17 @@
+# Backend folder
+cd "c:\Users\RD Models\Desktop\WHATSAPP AI CHAT BOT\QR API Saas\backend"
+taskkill /F /IM node.exe   # पिछले Node प्रॉसेस को रोकें (यदि चल रहे हों)
+node server.js
+
+
+# Frontend folder
+cd "c:\Users\RD Models\Desktop\WHATSAPP AI CHAT BOT\QR API Saas\frontend"
+npm run dev
+
+
+
+
+
 Solid Models - Complete System Design (Full Detail)
 Bhai, main poora system detail mein explain karta hoon - har page, har workflow, aur inbox ka logic sab kuch.
 
