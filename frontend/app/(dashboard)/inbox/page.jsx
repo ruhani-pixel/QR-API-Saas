@@ -16,17 +16,6 @@ import EmojiPicker from 'emoji-picker-react';
 const socket = io('http://localhost:3001');
 const API_URL = 'http://localhost:3001';
 
-// PREMIUM COLOR TOKENS
-const THEME = {
-  primary: '#008069',
-  bg: '#F0F2F5',
-  border: '#D1D7DB',
-  text: '#111B21',
-  textSecondary: '#667781',
-  bubbleOut: '#D9FDD3',
-  bubbleIn: '#FFFFFF'
-};
-
 export default function InboxPage() {
   const [devices, setDevices] = useState([]);
   const [selectedSessionId, setSelectedSessionId] = useState(null);
@@ -39,6 +28,7 @@ export default function InboxPage() {
   const [presences, setPresences] = useState({});
   const [profilePics, setProfilePics] = useState({});
   
+  const [isDeviceMenuOpen, setIsDeviceMenuOpen] = useState(false);
   const [isEmojiOpen, setIsEmojiOpen] = useState(false);
   const [isMediaMenuOpen, setIsMediaMenuOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -53,7 +43,7 @@ export default function InboxPage() {
   useEffect(() => {
     fetch(`${API_URL}/api/sessions`).then(r => r.json()).then(data => {
       setDevices(data);
-      if (data.length > 0) setSelectedSessionId(data[0].sessionId);
+      if (data.length > 0 && !selectedSessionId) setSelectedSessionId(data[0].sessionId);
     });
   }, []);
 
@@ -111,19 +101,22 @@ export default function InboxPage() {
   };
 
   const startRecording = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const recorder = new MediaRecorder(stream);
-    const chunks = [];
-    recorder.ondataavailable = e => chunks.push(e.data);
-    recorder.onstop = () => handleMediaUpload(new File([new Blob(chunks)], "voice.ogg", { type: 'audio/ogg' }));
-    recorder.start();
-    mediaRecorderRef.current = recorder;
-    setIsRecording(true);
-    setRecordingTime(0);
-    recordingIntervalRef.current = setInterval(() => setRecordingTime(p => p + 1), 1000);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks = [];
+      recorder.ondataavailable = e => chunks.push(e.data);
+      recorder.onstop = () => handleMediaUpload(new File([new Blob(chunks)], "voice.ogg", { type: 'audio/ogg' }));
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+      setRecordingTime(0);
+      recordingIntervalRef.current = setInterval(() => setRecordingTime(p => p + 1), 1000);
+    } catch (e) { console.error("Mic error:", e); }
   };
 
   const stopRecording = (send = true) => {
+    if (!mediaRecorderRef.current) return;
     clearInterval(recordingIntervalRef.current);
     if (!send) mediaRecorderRef.current.onstop = null;
     mediaRecorderRef.current.stop();
@@ -139,6 +132,8 @@ export default function InboxPage() {
     </div>
   );
 
+  const activeDevice = devices.find(d => d.sessionId === selectedSessionId);
+
   return (
     <div className="flex h-screen bg-[#F0F2F5] text-[#111B21] overflow-hidden font-sans antialiased">
         <input type="file" ref={fileInputRef} className="hidden" onChange={e => handleMediaUpload(e.target.files[0])} />
@@ -146,8 +141,33 @@ export default function InboxPage() {
         {/* CHAT LIST */}
         <div className={cn("w-full md:w-[420px] flex flex-col bg-white border-r border-[#D1D7DB] z-20", selectedChat && "hidden md:flex")}>
           <div className="bg-[#F0F2F5] h-[59px] px-4 flex items-center justify-between">
-            <div className="w-10 h-10 rounded-full bg-[#DFE5E7] flex items-center justify-center overflow-hidden border border-white cursor-pointer"><UserCircle2 size={42} className="text-[#AEBAC1]" /></div>
-            <div className="flex items-center gap-6 text-[#54656F]">
+            <div className="flex items-center gap-3">
+               <div className="w-10 h-10 rounded-full bg-[#DFE5E7] flex items-center justify-center overflow-hidden border border-white cursor-pointer"><UserCircle2 size={42} className="text-[#AEBAC1]" /></div>
+               <div className="relative">
+                  <button onClick={() => setIsDeviceMenuOpen(!isDeviceMenuOpen)} className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full shadow-sm border border-[#D1D7DB] hover:bg-slate-50 transition-all">
+                     <div className={cn("w-2 h-2 rounded-full", activeDevice?.status === 'online' ? "bg-[#25D366]" : "bg-slate-300")} />
+                     <span className="text-[12px] font-bold tracking-tight text-slate-700">{activeDevice?.name || 'Switch Node'}</span>
+                     <ChevronDown size={14} className={cn("text-slate-400 transition-transform", isDeviceMenuOpen && "rotate-180")} />
+                  </button>
+                  <AnimatePresence>
+                     {isDeviceMenuOpen && (
+                        <>
+                           <div className="fixed inset-0 z-40" onClick={() => setIsDeviceMenuOpen(false)} />
+                           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute top-full left-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 p-1.5 z-50">
+                              {devices.map(d => (
+                                 <button key={d.sessionId} onClick={() => { setSelectedSessionId(d.sessionId); setSelectedChat(null); setIsDeviceMenuOpen(false); }} className={cn("w-full flex items-center gap-3 p-3 rounded-lg transition-colors", selectedSessionId === d.sessionId ? "bg-[#008069]/10 text-[#008069]" : "hover:bg-slate-50")}>
+                                    <Smartphone size={16} />
+                                    <span className="text-[13px] font-medium truncate">{d.name}</span>
+                                    {selectedSessionId === d.sessionId && <Check size={14} className="ml-auto" />}
+                                 </button>
+                              ))}
+                           </motion.div>
+                        </>
+                     )}
+                  </AnimatePresence>
+               </div>
+            </div>
+            <div className="flex items-center gap-5 text-[#54656F]">
                <button className="hover:bg-[#D9DBDF] p-2 rounded-full transition-colors"><Users size={22} /></button>
                <button className="hover:bg-[#D9DBDF] p-2 rounded-full transition-colors"><MessageSquarePlus size={22} /></button>
                <button className="hover:bg-[#D9DBDF] p-2 rounded-full transition-colors"><MoreVertical size={22} /></button>
@@ -161,15 +181,15 @@ export default function InboxPage() {
              </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto no-scrollbar">
             {filteredChats.map(chat => (
               <button key={chat.id} onClick={() => { setSelectedChat(chat); fetchChatHistory(chat.id); }} className={cn("w-full h-18 px-3 flex items-center gap-3 hover:bg-[#F5F6F6] transition-colors border-b border-[#F0F2F5]", selectedChat?.id === chat.id && "bg-[#F0F2F5]")}>
                 <div className="w-12 h-12 rounded-full bg-[#DFE5E7] flex items-center justify-center overflow-hidden shrink-0">
                   {chat.profilePic ? <img src={chat.profilePic} className="w-full h-full object-cover" /> : <UserCircle2 size={48} className="text-[#AEBAC1]" />}
                 </div>
-                <div className="flex-1 text-left min-w-0">
+                <div className="flex-1 text-left min-w-0 py-3">
                    <div className="flex justify-between items-center"><span className="text-[17px] font-medium truncate">{chat.name}</span><span className="text-[12px] text-[#667781]">{new Date(chat.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
-                   <div className="flex items-center gap-1"><p className="text-[14px] text-[#667781] truncate">{chat.lastMessage}</p></div>
+                   <div className="flex items-center gap-1"><p className="text-[14.5px] text-[#667781] truncate">{chat.lastMessage}</p></div>
                 </div>
               </button>
             ))}
@@ -211,7 +231,7 @@ export default function InboxPage() {
                    {messages.map((msg, i) => {
                      const isOut = msg.direction === 'outbound';
                      if (msg.type === 'sticker') return (
-                        <div key={msg.id || i} className={cn("flex w-full mb-4", isOut ? "justify-end" : "justify-start")}>
+                        <div key={msg.whatsappId || i} className={cn("flex w-full mb-4", isOut ? "justify-end" : "justify-start")}>
                            <div className="flex items-end gap-2">
                               <img src={`${API_URL}${msg.mediaPath}`} className="w-40 h-40 object-contain" />
                               <span className="text-[10px] text-[#667781] font-medium">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -219,7 +239,7 @@ export default function InboxPage() {
                         </div>
                      );
                      return (
-                        <div key={msg.id || i} className={cn("flex w-full", isOut ? "justify-end" : "justify-start")}>
+                        <div key={msg.whatsappId || i} className={cn("flex w-full", isOut ? "justify-end" : "justify-start")}>
                            <div className={cn(
                               "relative max-w-[65%] min-w-[80px] shadow-[0_1px_1px_rgba(0,0,0,0.1)] px-2 py-1.5",
                               isOut ? "bg-[#D9FDD3] rounded-l-lg rounded-br-lg" : "bg-white rounded-r-lg rounded-bl-lg",
@@ -234,17 +254,17 @@ export default function InboxPage() {
                                 </div>
                               )}
                               {msg.type === 'document' && (
-                                <div className="p-3 flex items-center gap-3 min-w-[240px] bg-white rounded-md m-1">
+                                <div className="p-3 flex items-center gap-3 min-w-[240px] bg-white rounded-md m-1 border border-slate-100">
                                    <div className="w-10 h-10 bg-[#FF5F38] rounded-lg flex items-center justify-center shrink-0"><FileText className="text-white" /></div>
-                                   <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{msg.fileName}</p><p className="text-[11px] text-[#667781] uppercase">PDF • 2 MB</p></div>
-                                   <Download size={20} className="text-[#667781]" />
+                                   <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{msg.fileName || 'File'}</p><p className="text-[11px] text-[#667781] uppercase">Document</p></div>
+                                   <a href={`${API_URL}${msg.mediaPath}`} download className="p-2 text-[#667781] hover:text-[#008069]"><Download size={20} /></a>
                                 </div>
                               )}
 
-                              {msg.content && <p className="text-[14.2px] px-1 py-0.5 leading-relaxed break-words">{msg.content}</p>}
+                              {msg.content && <p className="text-[14.5px] px-1 py-0.5 leading-relaxed break-words whitespace-pre-wrap">{msg.content}</p>}
                               
-                              <div className="flex items-center justify-end gap-1 mt-0.5 px-1">
-                                 <span className="text-[10px] text-[#667781] uppercase">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              <div className="flex items-center justify-end gap-1 mt-0.5 px-1 select-none">
+                                 <span className="text-[10px] text-[#667781] font-medium uppercase">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                  {isOut && <Ticks status={msg.status} />}
                               </div>
                            </div>
@@ -255,22 +275,22 @@ export default function InboxPage() {
                 </div>
 
                 {/* PILL INPUT */}
-                <div className="bg-[#F0F2F5] min-h-[62px] px-4 py-2 flex items-center gap-4 relative z-40">
-                   <AnimatePresence>{isEmojiOpen && <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute bottom-full left-4 mb-4"><EmojiPicker onEmojiClick={d => setInputText(p => p + d.emoji)} width={350} height={400} /></motion.div>}</AnimatePresence>
+                <div className="bg-[#F0F2F5] min-h-[62px] px-4 py-2 flex items-center gap-4 relative z-40 border-t border-[#D1D7DB]">
+                   <AnimatePresence>{isEmojiOpen && <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute bottom-full left-4 mb-4 z-50"><EmojiPicker onEmojiClick={d => setInputText(p => p + d.emoji)} width={350} height={400} /></motion.div>}</AnimatePresence>
                    
-                   <div className="flex-1 bg-white h-[46px] rounded-full px-2 flex items-center gap-1 shadow-sm">
+                   <div className="flex-1 bg-white h-[46px] rounded-full px-2 flex items-center gap-1 shadow-sm border border-slate-200">
                       {isRecording ? (
                         <div className="flex-1 flex items-center justify-between px-4">
-                           <div className="flex items-center gap-3"><div className="w-2 h-2 bg-rose-500 rounded-full animate-pulse" /><span className="text-sm font-medium">{Math.floor(recordingTime/60)}:{(recordingTime%60).toString().padStart(2,'0')}</span></div>
-                           <div className="flex items-center gap-4"><button onClick={() => stopRecording(false)} className="text-rose-500"><Trash2 size={20} /></button><button onClick={() => stopRecording(true)} className="text-[#008069]"><Send size={20} /></button></div>
+                           <div className="flex items-center gap-3"><div className="w-2 h-2 bg-rose-500 rounded-full animate-pulse" /><span className="text-sm font-bold text-slate-600">{Math.floor(recordingTime/60)}:{(recordingTime%60).toString().padStart(2,'0')}</span></div>
+                           <div className="flex items-center gap-4"><button onClick={() => stopRecording(false)} className="text-rose-500 hover:text-rose-600 transition-colors p-1"><Trash2 size={20} /></button><button onClick={() => stopRecording(true)} className="text-[#008069] hover:text-[#006050] transition-colors p-1"><Send size={20} /></button></div>
                         </div>
                       ) : (
                         <>
-                           <button onClick={() => setIsEmojiOpen(!isEmojiOpen)} className="text-[#54656F] p-2 hover:bg-slate-100 rounded-full"><Smile size={24} /></button>
-                           <button onClick={() => fileInputRef.current.click()} className="text-[#54656F] p-2 hover:bg-slate-100 rounded-full"><Plus size={24} /></button>
-                           <input type="text" placeholder="Type a message" className="flex-1 bg-transparent border-none text-[15px] focus:outline-none px-2" value={inputText} onChange={e => setInputText(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleSendMessage()} />
+                           <button onClick={() => setIsEmojiOpen(!isEmojiOpen)} className="text-[#54656F] p-2 hover:bg-slate-50 rounded-full transition-colors"><Smile size={24} /></button>
+                           <button onClick={() => fileInputRef.current.click()} className="text-[#54656F] p-2 hover:bg-slate-50 rounded-full transition-colors"><Plus size={24} /></button>
+                           <input type="text" placeholder="Type a message" className="flex-1 bg-transparent border-none text-[15px] focus:outline-none px-2 font-medium" value={inputText} onChange={e => setInputText(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleSendMessage()} />
                            <div className="w-10 h-10 flex items-center justify-center">
-                              {inputText.trim() ? <button onClick={handleSendMessage} className="text-[#008069]"><Send size={24} /></button> : <button onClick={startRecording} className="text-[#54656F]"><Mic size={24} /></button>}
+                              {inputText.trim() ? <button onClick={handleSendMessage} className="text-[#008069] hover:text-[#006050] transition-colors"><Send size={24} /></button> : <button onClick={startRecording} className="text-[#54656F] hover:text-[#008069] transition-colors"><Mic size={24} /></button>}
                            </div>
                         </>
                       )}
