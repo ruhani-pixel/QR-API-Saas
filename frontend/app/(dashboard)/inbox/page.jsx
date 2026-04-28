@@ -6,7 +6,7 @@ import {
   Users, MessageSquarePlus, ChevronDown, Image as ImageIcon, 
   FileText, X, Download, Loader2, Camera, UserCircle2, 
   ShieldCheck, Music, Play, Mic, Plus, Smile, Trash2,
-  ChevronLeft, Video
+  ChevronLeft, Video, Bot, Sparkles
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 import { cn } from '@/lib/utils';
@@ -25,15 +25,13 @@ export default function InboxPage() {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [presences, setPresences] = useState({});
-  const [profilePics, setProfilePics] = useState({});
   
   const [isDeviceMenuOpen, setIsDeviceMenuOpen] = useState(false);
   const [isEmojiOpen, setIsEmojiOpen] = useState(false);
-  const [isMediaMenuOpen, setIsMediaMenuOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [isSendingMedia, setIsSendingMedia] = useState(false);
+  const [isChatAIEnabled, setIsChatAIEnabled] = useState(true);
 
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -60,6 +58,14 @@ export default function InboxPage() {
     setFilteredChats(chats.filter(c => c.name.toLowerCase().includes(q)));
   }, [searchQuery, chats]);
 
+  useEffect(() => {
+    if (selectedChat) {
+      fetch(`${API_URL}/api/ai/contact-status?sessionId=${selectedSessionId}&remoteJid=${selectedChat.id}`)
+        .then(r => r.json())
+        .then(data => setIsChatAIEnabled(data.aiEnabled));
+    }
+  }, [selectedChat, selectedSessionId]);
+
   useEffect(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), [messages]);
 
   const fetchChats = async () => {
@@ -73,6 +79,16 @@ export default function InboxPage() {
     const res = await fetch(`${API_URL}/api/whatsapp/messages?sessionId=${selectedSessionId}&remoteJid=${remoteJid}`);
     const data = await res.json();
     setMessages(data);
+  };
+
+  const toggleChatAI = async () => {
+    const newState = !isChatAIEnabled;
+    setIsChatAIEnabled(newState);
+    await fetch(`${API_URL}/api/ai/contact-toggle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: selectedSessionId, remoteJid: selectedChat.id, aiEnabled: newState })
+    });
   };
 
   const handleSendMessage = async () => {
@@ -177,14 +193,14 @@ export default function InboxPage() {
           <div className="p-3">
              <div className="flex items-center bg-[#F0F2F5] rounded-lg px-4 focus-within:bg-white focus-within:shadow-sm border border-transparent focus-within:border-[#008069] transition-all">
                 <Search size={18} className="text-[#54656F]" />
-                <input type="text" placeholder="Search or start a new chat" className="w-full bg-transparent border-none py-2 pl-4 text-[15px] focus:outline-none" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                <input type="text" placeholder="Search or start a new chat" className="w-full bg-transparent border-none py-2 pl-4 text-[15px] focus:outline-none font-medium" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
              </div>
           </div>
 
           <div className="flex-1 overflow-y-auto no-scrollbar">
             {filteredChats.map(chat => (
               <button key={chat.id} onClick={() => { setSelectedChat(chat); fetchChatHistory(chat.id); }} className={cn("w-full h-18 px-3 flex items-center gap-3 hover:bg-[#F5F6F6] transition-colors border-b border-[#F0F2F5]", selectedChat?.id === chat.id && "bg-[#F0F2F5]")}>
-                <div className="w-12 h-12 rounded-full bg-[#DFE5E7] flex items-center justify-center overflow-hidden shrink-0">
+                <div className="w-12 h-12 rounded-full bg-[#DFE5E7] flex items-center justify-center overflow-hidden shrink-0 relative">
                   {chat.profilePic ? <img src={chat.profilePic} className="w-full h-full object-cover" /> : <UserCircle2 size={48} className="text-[#AEBAC1]" />}
                 </div>
                 <div className="flex-1 text-left min-w-0 py-3">
@@ -203,9 +219,9 @@ export default function InboxPage() {
            {!selectedChat ? (
              <div className="flex-1 flex flex-col items-center justify-center bg-[#F0F2F5] p-10 text-center relative z-10">
                 <img src="https://static.whatsapp.net/rsrc.php/v3/y6/r/wa669ae5yIx.png" className="w-64 h-64 mb-10 opacity-60 grayscale" />
-                <h2 className="text-[32px] font-light text-[#41525D] mb-4">WhatsApp Web</h2>
-                <p className="text-[14px] text-[#667781] max-w-sm">Send and receive messages without keeping your phone online. Use WhatsApp on up to 4 linked devices at the same time.</p>
-                <div className="mt-20 flex items-center gap-2 text-[#8696a0] text-[12px] uppercase tracking-widest"><ShieldCheck size={16} /><span>End-to-end encrypted</span></div>
+                <h2 className="text-[32px] font-light text-[#41525D] mb-4 text-slate-800">WhatsApp Web</h2>
+                <p className="text-[14px] text-[#667781] max-w-sm">Connect multiple nodes and manage AI automated responses seamlessly from one premium interface.</p>
+                <div className="mt-20 flex items-center gap-2 text-[#8696a0] text-[12px] uppercase tracking-widest"><ShieldCheck size={16} /><span>Solid Models Neural Engine</span></div>
              </div>
            ) : (
              <div className="flex-1 flex flex-col h-full relative z-10">
@@ -217,53 +233,45 @@ export default function InboxPage() {
                       </div>
                       <div className="flex flex-col">
                          <h2 className="text-[16px] font-medium leading-tight">{selectedChat.name}</h2>
-                         <span className="text-[12px] text-[#667781]">{selectedChat.isGroup ? 'Group' : 'online'}</span>
+                         <span className="text-[12px] text-[#667781]">online</span>
                       </div>
                    </div>
-                   <div className="flex items-center gap-6 text-[#54656F]">
-                      <button><Video size={22} /></button><button><Search size={22} /></button><button><MoreVertical size={22} /></button>
+                   <div className="flex items-center gap-6">
+                      <div className="flex items-center gap-2 bg-white px-4 py-1.5 rounded-full border border-slate-200 shadow-sm">
+                         <Bot size={16} className={cn("transition-colors", isChatAIEnabled ? "text-indigo-600" : "text-slate-300")} />
+                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">AI Reply</span>
+                         <button 
+                           onClick={toggleChatAI}
+                           className={cn("w-9 h-5 rounded-full relative flex items-center px-1 transition-all duration-500", isChatAIEnabled ? "bg-indigo-600" : "bg-slate-300")}
+                         >
+                            <motion.div animate={{ x: isChatAIEnabled ? 16 : 0 }} className="w-3 h-3 bg-white rounded-full shadow-sm" />
+                         </button>
+                      </div>
+                      <div className="flex items-center gap-6 text-[#54656F] ml-4">
+                         <button><Video size={22} /></button><button><Search size={22} /></button><button><MoreVertical size={22} /></button>
+                      </div>
                    </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-8 space-y-2 no-scrollbar bg-[#EFEAE2]/60">
-                   <div className="flex justify-center mb-6"><div className="bg-[#FFF9C4] px-4 py-2 rounded-lg text-[12.5px] text-[#54656f] text-center shadow-sm max-w-[500px]">Messages are end-to-end encrypted. No one outside of this chat, not even WhatsApp, can read or listen to them.</div></div>
-                   
                    {messages.map((msg, i) => {
                      const isOut = msg.direction === 'outbound';
-                     if (msg.type === 'sticker') return (
-                        <div key={msg.whatsappId || i} className={cn("flex w-full mb-4", isOut ? "justify-end" : "justify-start")}>
-                           <div className="flex items-end gap-2">
-                              <img src={`${API_URL}${msg.mediaPath}`} className="w-40 h-40 object-contain" />
-                              <span className="text-[10px] text-[#667781] font-medium">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                           </div>
-                        </div>
-                     );
                      return (
                         <div key={msg.whatsappId || i} className={cn("flex w-full", isOut ? "justify-end" : "justify-start")}>
                            <div className={cn(
-                              "relative max-w-[65%] min-w-[80px] shadow-[0_1px_1px_rgba(0,0,0,0.1)] px-2 py-1.5",
-                              isOut ? "bg-[#D9FDD3] rounded-l-lg rounded-br-lg" : "bg-white rounded-r-lg rounded-bl-lg",
+                              "relative max-w-[65%] min-w-[80px] shadow-sm px-2 py-1.5",
+                              isOut ? "bg-[#D9FDD3] rounded-l-lg rounded-br-lg border-l border-t border-[#c5eebf]" : "bg-white rounded-r-lg rounded-bl-lg border-r border-t border-slate-100",
                               (msg.type === 'image' || msg.type === 'video') && "p-0 overflow-hidden"
                            )}>
                               {msg.type === 'image' && <img src={`${API_URL}${msg.mediaPath}`} className="w-full h-auto max-h-[400px] object-cover" />}
-                              {msg.type === 'video' && <video src={`${API_URL}${msg.mediaPath}`} className="w-full h-auto max-h-[400px] object-cover" />}
                               {msg.type === 'audio' && (
                                 <div className="p-3 flex items-center gap-3 min-w-[240px]">
                                    <div className="w-10 h-10 bg-[#008069] text-white rounded-full flex items-center justify-center shrink-0"><Play size={20} className="ml-1 fill-current" /></div>
                                    <div className="flex-1 h-3 flex items-center gap-0.5">{[...Array(20)].map((_, i) => <div key={i} className="w-0.5 h-full bg-[#008069]/20 rounded-full" />)}</div>
                                 </div>
                               )}
-                              {msg.type === 'document' && (
-                                <div className="p-3 flex items-center gap-3 min-w-[240px] bg-white rounded-md m-1 border border-slate-100">
-                                   <div className="w-10 h-10 bg-[#FF5F38] rounded-lg flex items-center justify-center shrink-0"><FileText className="text-white" /></div>
-                                   <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{msg.fileName || 'File'}</p><p className="text-[11px] text-[#667781] uppercase">Document</p></div>
-                                   <a href={`${API_URL}${msg.mediaPath}`} download className="p-2 text-[#667781] hover:text-[#008069]"><Download size={20} /></a>
-                                </div>
-                              )}
-
                               {msg.content && <p className="text-[14.5px] px-1 py-0.5 leading-relaxed break-words whitespace-pre-wrap">{msg.content}</p>}
-                              
-                              <div className="flex items-center justify-end gap-1 mt-0.5 px-1 select-none">
+                              <div className="flex items-center justify-end gap-1 mt-0.5 px-1">
                                  <span className="text-[10px] text-[#667781] font-medium uppercase">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                  {isOut && <Ticks status={msg.status} />}
                               </div>
@@ -276,13 +284,11 @@ export default function InboxPage() {
 
                 {/* PILL INPUT */}
                 <div className="bg-[#F0F2F5] min-h-[62px] px-4 py-2 flex items-center gap-4 relative z-40 border-t border-[#D1D7DB]">
-                   <AnimatePresence>{isEmojiOpen && <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute bottom-full left-4 mb-4 z-50"><EmojiPicker onEmojiClick={d => setInputText(p => p + d.emoji)} width={350} height={400} /></motion.div>}</AnimatePresence>
-                   
                    <div className="flex-1 bg-white h-[46px] rounded-full px-2 flex items-center gap-1 shadow-sm border border-slate-200">
                       {isRecording ? (
                         <div className="flex-1 flex items-center justify-between px-4">
-                           <div className="flex items-center gap-3"><div className="w-2 h-2 bg-rose-500 rounded-full animate-pulse" /><span className="text-sm font-bold text-slate-600">{Math.floor(recordingTime/60)}:{(recordingTime%60).toString().padStart(2,'0')}</span></div>
-                           <div className="flex items-center gap-4"><button onClick={() => stopRecording(false)} className="text-rose-500 hover:text-rose-600 transition-colors p-1"><Trash2 size={20} /></button><button onClick={() => stopRecording(true)} className="text-[#008069] hover:text-[#006050] transition-colors p-1"><Send size={20} /></button></div>
+                           <div className="flex items-center gap-3 text-slate-600"><div className="w-2 h-2 bg-rose-500 rounded-full animate-pulse" /><span className="text-sm font-bold">{Math.floor(recordingTime/60)}:{(recordingTime%60).toString().padStart(2,'0')}</span></div>
+                           <div className="flex items-center gap-4"><button onClick={() => stopRecording(false)} className="text-rose-500 p-1"><Trash2 size={20} /></button><button onClick={() => stopRecording(true)} className="text-[#008069] p-1"><Send size={20} /></button></div>
                         </div>
                       ) : (
                         <>
@@ -290,7 +296,7 @@ export default function InboxPage() {
                            <button onClick={() => fileInputRef.current.click()} className="text-[#54656F] p-2 hover:bg-slate-50 rounded-full transition-colors"><Plus size={24} /></button>
                            <input type="text" placeholder="Type a message" className="flex-1 bg-transparent border-none text-[15px] focus:outline-none px-2 font-medium" value={inputText} onChange={e => setInputText(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleSendMessage()} />
                            <div className="w-10 h-10 flex items-center justify-center">
-                              {inputText.trim() ? <button onClick={handleSendMessage} className="text-[#008069] hover:text-[#006050] transition-colors"><Send size={24} /></button> : <button onClick={startRecording} className="text-[#54656F] hover:text-[#008069] transition-colors"><Mic size={24} /></button>}
+                              {inputText.trim() ? <button onClick={handleSendMessage} className="text-[#008069]"><Send size={24} /></button> : <button onClick={startRecording} className="text-[#54656F]"><Mic size={24} /></button>}
                            </div>
                         </>
                       )}
