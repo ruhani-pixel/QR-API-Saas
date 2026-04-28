@@ -462,4 +462,12 @@ export default function DevicesPage() {
                   </button>
                   <button onClick={() => setConfirmAction(null)} className="w-full py-4 bg-slate-50 text-slate-400 rounded-2xl font-black uppercase tracking-widest text-xs transition-all hover:bg-slate-100">
                      Cancel
-                  </button
+                  </button>
+               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
