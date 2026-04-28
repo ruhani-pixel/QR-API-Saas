@@ -160,9 +160,15 @@ async function updateDeviceStatus(sessionId, status, clearQR = false) {
     const data = { status };
     if (clearQR) data.currentQR = null;
     
-    await prisma.device.update({
+    await prisma.device.upsert({
       where: { sessionId },
-      data
+      update: data,
+      create: {
+        sessionId,
+        name: `Node ${sessionId}`,
+        status,
+        currentQR: null
+      }
     });
   } catch (e) {
     console.error('Failed to update status:', e);

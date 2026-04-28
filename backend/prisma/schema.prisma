@@ -64,6 +64,8 @@ model Message {
   type             String    @default("text") // text | image | video | document
   direction        String    // inbound | outbound
   status           String    @default("delivered") // pending | sent | delivered | read | failed
+  mediaPath        String?   // For images/videos/docs
+  fileName         String?   // Original filename
   timestamp        DateTime  @default(now())
   messageTimestamp Int?      // Original WhatsApp timestamp
   
