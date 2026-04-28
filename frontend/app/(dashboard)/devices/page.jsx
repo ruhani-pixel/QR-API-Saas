@@ -11,11 +11,9 @@ import {
   Sparkles, Smartphone, Laptop, Zap,
   Link2, Link2Off, LogOut, AlertTriangle
 } from 'lucide-react';
-import { io } from 'socket.io-client';
+import { socket, API_URL } from '@/lib/apiConfig';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function DevicesPage() {
   const [devices, setDevices] = useState([]);
@@ -40,14 +38,14 @@ export default function DevicesPage() {
   useEffect(() => {
     fetchDevices();
     
-    const socket = io(API_URL, {
-      transports: ['polling', 'websocket'],
-      reconnectionAttempts: 10
-    });
-    socketRef.current = socket;
+    setSocketConnected(socket.connected);
 
     socket.on('connect', () => {
       setSocketConnected(true);
+    });
+
+    socket.on('disconnect', () => {
+      setSocketConnected(false);
     });
 
     socket.on('qr', (data) => {
@@ -88,7 +86,10 @@ export default function DevicesPage() {
     });
 
     return () => { 
-      socket.disconnect(); 
+      socket.off('qr');
+      socket.off('device:status');
+      socket.off('connect');
+      socket.off('disconnect');
       if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
     };
   }, []);

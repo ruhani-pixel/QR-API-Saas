@@ -49,31 +49,40 @@ const whatsapp = new Whatsapp({
       io.emit('qr', { sessionId: sid, qr });
     }
   },
-  // जब QR स्कैन हो कर डिवाइस ऑनलाइन होता है तो स्टेटस को ठीक से अपडेट करें
-  // sessionId कभी स्ट्रिंग होता है, कभी ऑब्जेक्ट – दोनों को नॉर्मलाइज़ करके emit करें
   onConnected: (sessionId) => {
-    const sid = String(sessionId?.sessionId || sessionId || '').toLowerCase();
-    if (!sid) return;
-    io.emit('device:status', { sessionId: sid, status: 'online' });
-    updateDeviceStatus(sid, 'online', true);
+    // Normalizing sessionId: it could be an object { sessionId: '...' } or a string
+    const sid = typeof sessionId === 'object' ? sessionId.sessionId : sessionId;
+    const cleanSid = String(sid || '').toLowerCase();
+    
+    if (cleanSid) {
+      console.log(`[SESSION] Connected: ${cleanSid}`);
+      io.emit('device:status', { sessionId: cleanSid, status: 'online' });
+      updateDeviceStatus(cleanSid, 'online', true);
+    }
   },
   onMessageUpdated: (data) => {
+    const whatsappId = data.update?.key?.id;
+    if (!whatsappId) return;
+
     // Real-time status update (delivered, read, failed)
     io.emit('message:status', { 
       sessionId: data.sessionId, 
-      whatsappId: data.update.key.id, 
+      whatsappId: whatsappId, 
       status: data.messageStatus 
     });
     // Update DB status
     prisma.message.update({ 
-      where: { whatsappId: data.update.key.id }, 
+      where: { whatsappId }, 
       data: { status: data.messageStatus } 
     }).catch(() => {});
   },
   onDisconnected: (sessionId, reason) => {
-    const sid = typeof sessionId === 'string' ? sessionId : sessionId.sessionId || String(sessionId);
-    io.emit('device:status', { sessionId: sid, status: 'offline' });
-    updateDeviceStatus(sid, 'offline');
+    const cleanSid = String((typeof sessionId === 'object' ? sessionId.sessionId : sessionId) || '').toLowerCase();
+    if (cleanSid) {
+      console.log(`[SESSION] Disconnected: ${cleanSid} (Reason: ${reason})`);
+      io.emit('device:status', { sessionId: cleanSid, status: 'offline' });
+      updateDeviceStatus(cleanSid, 'offline');
+    }
   },
   onMessageReceived: async (msg) => {
     await saveOrUpdateMessage(msg);
@@ -343,16 +352,31 @@ app.post('/api/ai/config', async (req, res) => {
 });
 
 app.post('/api/ai/test', async (req, res) => {
+  const { instructions, history, message } = req.body;
   try {
     const model = genAI.getGenerativeModel({ 
       model: "gemini-2.0-flash-lite",
       generationConfig: { maxOutputTokens: 500, temperature: 0.7 }
     });
-    const chatContext = history.map(m => `${m.role === 'user' ? 'U' : 'A'}: ${m.content}`).join('\n');
-    const prompt = `Strict Instructions: DIRECT REPLY ONLY. NO THINKING PROCESS.\n\nSystem Instructions: ${instructions}\n\nChat History:\n${chatContext}\nUser: ${message}\nAssistant:`;
+    
+    const chatContext = (history || []).map(m => `${m.role === 'user' ? 'U' : 'A'}: ${m.content}`).join('\n');
+    const prompt = `Strict Instructions: DIRECT REPLY ONLY. NO THINKING PROCESS.
+TALK LIKE A PROFESSIONAL HUMAN ASSISTANT.
+
+System Instructions: ${instructions || 'No specific instructions.'}
+
+Chat History:
+${chatContext}
+
+User: ${message}
+Assistant:`;
+
     const result = await model.generateContent(prompt);
     res.json({ response: result.response.text() });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { 
+    console.error('AI Test Error:', e);
+    res.status(500).json({ error: e.message }); 
+  }
 });
 
 app.post('/api/ai/contact-toggle', async (req, res) => {
