@@ -111,9 +111,13 @@ export default function AIConfigPage() {
         })
       });
       const data = await res.json();
-      setTestChat(prev => [...prev, { role: 'ai', content: data.response }]);
-    } catch (e) {
-      setTestChat(prev => [...prev, { role: 'ai', content: '⚠️ Error connecting to Gemini.' }]);
+      if (!res.ok) {
+         setTestChat(prev => [...prev, { role: 'error', content: data.error || 'Unknown API Error' }]);
+      } else {
+         setTestChat(prev => [...prev, { role: 'ai', content: data.response }]);
+      }
+    } catch (e: any) {
+      setTestChat(prev => [...prev, { role: 'error', content: e.message || 'Connection Failed' }]);
     }
     setIsTesting(false);
   };
@@ -270,18 +274,28 @@ export default function AIConfigPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar bg-slate-50/20">
-               {testChat.map((msg, i) => (
+                {testChat.map((msg, i) => (
                   <div key={i} className={cn("flex", msg.role === 'user' ? "justify-end" : "justify-start")}>
-                     <div className={cn(
-                        "max-w-[85%] px-5 py-3 rounded-2xl text-[13px] font-bold shadow-sm",
-                        msg.role === 'user' 
-                          ? "bg-slate-900 text-white rounded-tr-none" 
-                          : "bg-white text-slate-600 border border-slate-100 rounded-tl-none"
-                     )}>
-                        {msg.content}
-                     </div>
+                     {msg.role === 'error' ? (
+                        <div className="w-full bg-rose-50 text-rose-600 border border-rose-100 p-4 rounded-2xl text-[12px] font-bold shadow-sm animate-in fade-in slide-in-from-left-2">
+                           <div className="flex items-center gap-2 mb-1.5 opacity-70">
+                              <AlertCircle size={14} />
+                              <span className="uppercase tracking-[0.2em] text-[9px] font-black">Technical Error</span>
+                           </div>
+                           <p className="leading-relaxed">{msg.content}</p>
+                        </div>
+                     ) : (
+                        <div className={cn(
+                           "max-w-[85%] px-5 py-3 rounded-2xl text-[13px] font-bold shadow-sm",
+                           msg.role === 'user' 
+                             ? "bg-slate-900 text-white rounded-tr-none" 
+                             : "bg-white text-slate-600 border border-slate-100 rounded-tl-none"
+                        )}>
+                           {msg.content}
+                        </div>
+                     )}
                   </div>
-               ))}
+                ))}
                {isTesting && (
                   <div className="flex justify-start">
                      <div className="bg-white px-4 py-2 rounded-full border border-slate-100 flex gap-1">
