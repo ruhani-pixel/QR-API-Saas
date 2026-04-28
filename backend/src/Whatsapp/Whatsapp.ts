@@ -208,19 +208,24 @@ export class Whatsapp {
               const code = (lastDisconnect?.error as Boom)?.output?.statusCode;
               let retryAttempt = this.retryCount.get(sessionId) ?? 0;
               let shouldRetry = false;
-              if (code != DisconnectReason.loggedOut && retryAttempt < 10) {
-                shouldRetry = true;
-              }
               if (shouldRetry) {
                 retryAttempt++;
                 this.retryCount.set(sessionId, retryAttempt);
                 startSocket();
               } else {
                 const session = this.sessions.get(sessionId);
-                if (session)
+                if (session) {
                   this.sessions.get(sessionId).status = "disconnected";
+                }
                 this.retryCount.delete(sessionId);
-                this.deleteSession(sessionId);
+
+                if (code === DisconnectReason.loggedOut) {
+                  this.deleteSession(sessionId);
+                } else {
+                  session?.sock.end(undefined);
+                  this.sessions.delete(sessionId);
+                }
+
                 this.callback.get(CALLBACK_KEY.ON_DISCONNECTED)?.(sessionId);
                 options.onDisconnected?.();
               }
@@ -356,19 +361,24 @@ export class Whatsapp {
               const code = (lastDisconnect?.error as Boom)?.output?.statusCode;
               let retryAttempt = this.retryCount.get(sessionId) ?? 0;
               let shouldRetry = false;
-              if (code != DisconnectReason.loggedOut && retryAttempt < 10) {
-                shouldRetry = true;
-              }
               if (shouldRetry) {
                 retryAttempt++;
                 this.retryCount.set(sessionId, retryAttempt);
                 startSocket();
               } else {
                 const session = this.sessions.get(sessionId);
-                if (session)
+                if (session) {
                   this.sessions.get(sessionId).status = "disconnected";
+                }
                 this.retryCount.delete(sessionId);
-                this.deleteSession(sessionId);
+
+                if (code === DisconnectReason.loggedOut) {
+                  this.deleteSession(sessionId);
+                } else {
+                  session?.sock.end(undefined);
+                  this.sessions.delete(sessionId);
+                }
+
                 this.callback.get(CALLBACK_KEY.ON_DISCONNECTED)?.(sessionId);
                 options.onDisconnected?.();
               }
