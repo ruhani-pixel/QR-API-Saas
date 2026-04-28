@@ -11,10 +11,8 @@ import {
 import { io } from 'socket.io-client';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { socket, API_URL } from '@/lib/apiConfig';
 import EmojiPicker from 'emoji-picker-react';
-
-const socket = io('http://localhost:3001');
-const API_URL = 'http://localhost:3001';
 
 export default function InboxPage() {
   const [devices, setDevices] = useState([]);

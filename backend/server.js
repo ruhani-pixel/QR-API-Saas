@@ -49,8 +49,11 @@ const whatsapp = new Whatsapp({
       io.emit('qr', { sessionId: sid, qr });
     }
   },
+  // जब QR स्कैन हो कर डिवाइस ऑनलाइन होता है तो स्टेटस को ठीक से अपडेट करें
+  // sessionId कभी स्ट्रिंग होता है, कभी ऑब्जेक्ट – दोनों को नॉर्मलाइज़ करके emit करें
   onConnected: (sessionId) => {
-    const sid = typeof sessionId === 'string' ? sessionId : sessionId.sessionId || String(sessionId);
+    const sid = String(sessionId?.sessionId || sessionId || '').toLowerCase();
+    if (!sid) return;
     io.emit('device:status', { sessionId: sid, status: 'online' });
     updateDeviceStatus(sid, 'online', true);
   },
